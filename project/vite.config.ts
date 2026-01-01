@@ -10,7 +10,8 @@ export default defineConfig({
       manifest: {
         name: "Tantsaha Connect",
         short_name: "Tantsaha",
-        start_url: "/",
+        start_url: "./",
+        scope: "./",
         display: "standalone",
         theme_color: "#0ea5e9",
         background_color: "#ffffff",
