@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { UserPlus, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import type { Database } from '../lib/database.types';
+import { API_URL } from "../config";
+
+type Region = Database['public']['Tables']['regions']['Row'];
 
 interface RegisterProps {
   onShowLogin: () => void;
@@ -8,18 +12,40 @@ interface RegisterProps {
 
 export default function Register({ onShowLogin }: RegisterProps) {
   const { signUp } = useAuth();
-
+  const [regions, setRegions] = useState<Region[]>([]);
+  const [regionsLoading, setRegionsLoading] = useState(true);
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
     password: '',
     confirmPassword: '',
+    regionId: '',
     phone: '',
   });
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    loadRegions();
+  }, []);
+
+  async function loadRegions() {
+    setRegionsLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/regions`);
+      if (res.ok) {
+        const data = await res.json();
+        setRegions(data || []);
+      } else {
+        console.error('Load regions failed', res.status);
+      }
+    } catch (err) {
+      console.error('Load regions error', err);
+    } finally {
+      setRegionsLoading(false);
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,19 +58,23 @@ export default function Register({ onShowLogin }: RegisterProps) {
       return;
     }
 
+    if (!formData.regionId) {
+      setError('Mifidiana faritra');
+      setLoading(false);
+      return;
+    }
+
     const { error } = await signUp(
       formData.email,
       formData.password,
       formData.fullName,
+      formData.regionId,
       formData.phone
     );
 
     if (error) {
-      setError(
-        typeof error === 'string' && error.length > 0
-          ? error
-          : 'Tsy afaka nisoratra anarana. Misy olana.'
-      );
+      // show backend-provided error when available for easier debugging
+      setError(typeof error === 'string' && error.length > 0 ? error : 'Tsy afaka nisoratra anarana. Misy olana.');
     } else {
       setSuccess(true);
       setTimeout(() => {
@@ -94,13 +124,13 @@ export default function Register({ onShowLogin }: RegisterProps) {
               </label>
               <input
                 type="text"
-                required
-                disabled={loading}
                 value={formData.fullName}
                 onChange={(e) =>
                   setFormData({ ...formData, fullName: e.target.value })
                 }
-                className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-lg"
+                required
+                disabled={loading}
               />
             </div>
 
@@ -110,13 +140,13 @@ export default function Register({ onShowLogin }: RegisterProps) {
               </label>
               <input
                 type="email"
-                required
-                disabled={loading}
                 value={formData.email}
                 onChange={(e) =>
                   setFormData({ ...formData, email: e.target.value })
                 }
-                className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-lg"
+                required
+                disabled={loading}
               />
             </div>
 
@@ -126,13 +156,47 @@ export default function Register({ onShowLogin }: RegisterProps) {
               </label>
               <input
                 type="tel"
-                disabled={loading}
                 value={formData.phone}
                 onChange={(e) =>
                   setFormData({ ...formData, phone: e.target.value })
                 }
-                className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-lg"
+                disabled={loading}
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Faritra
+              </label>
+              <select
+                value={formData.regionId}
+                onChange={(e) =>
+                  setFormData({ ...formData, regionId: e.target.value })
+                }
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-lg"
+                required
+                disabled={loading || regionsLoading}
+              >
+                {regionsLoading ? (
+                  <option value="">Loading regions...</option>
+                ) : (
+                  <>
+                    <option value="" disabled>
+                      Mifidiana faritra
+                    </option>
+                    {regions.length === 0 ? (
+                      <option value="" disabled>Tsy misy faritra azo alaina</option>
+                    ) : (
+                      regions.map((region) => (
+                        <option key={region.id} value={region.id}>
+                          {region.name}
+                        </option>
+                      ))
+                    )}
+                  </>
+                )}
+              </select>
             </div>
 
             <div>
@@ -141,14 +205,14 @@ export default function Register({ onShowLogin }: RegisterProps) {
               </label>
               <input
                 type="password"
-                required
-                minLength={6}
-                disabled={loading}
                 value={formData.password}
                 onChange={(e) =>
                   setFormData({ ...formData, password: e.target.value })
                 }
-                className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-lg"
+                required
+                disabled={loading}
+                minLength={6}
               />
             </div>
 
@@ -158,21 +222,21 @@ export default function Register({ onShowLogin }: RegisterProps) {
               </label>
               <input
                 type="password"
-                required
-                minLength={6}
-                disabled={loading}
                 value={formData.confirmPassword}
                 onChange={(e) =>
                   setFormData({ ...formData, confirmPassword: e.target.value })
                 }
-                className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-lg"
+                required
+                disabled={loading}
+                minLength={6}
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <UserPlus className="w-5 h-5" />
               {loading ? 'Mahandrasa...' : 'Hisoratra anarana'}
