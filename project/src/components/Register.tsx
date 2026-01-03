@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { UserPlus, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import type { Database } from '../lib/database.types';
+import { API_URL } from "../config";
 
 type Region = Database['public']['Tables']['regions']['Row'];
 
@@ -13,7 +14,6 @@ export default function Register({ onShowLogin }: RegisterProps) {
   const { signUp } = useAuth();
   const [regions, setRegions] = useState<Region[]>([]);
   const [regionsLoading, setRegionsLoading] = useState(true);
-  const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -33,7 +33,7 @@ export default function Register({ onShowLogin }: RegisterProps) {
   async function loadRegions() {
     setRegionsLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/regions`);
+      const res = await fetch(`${API_URL}/api/regions`);
       if (res.ok) {
         const data = await res.json();
         setRegions(data || []);
@@ -175,7 +175,6 @@ export default function Register({ onShowLogin }: RegisterProps) {
                   setFormData({ ...formData, regionId: e.target.value })
                 }
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-lg"
-                required
                 disabled={loading || regionsLoading}
               >
                 {regionsLoading ? (

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "../contexts/AuthContext";
+import { API_URL } from "../config";
 
 type WeatherAlertRow = {
   id: string;
@@ -92,7 +93,7 @@ export default function Alerts({ onNavigate }: AlertsProps) {
       if (!cancelled) setLoading(true);
 
       try {
-        const res = await fetch(`/api/alerts/by-weather/${id}?limit=3`);
+        const res = await fetch(`${API_URL}/api/alerts/by-weather/${id}?limit=3`);
         const data: AlertsPayload = res.ok ? await res.json() : { meta: null, alerts: [] };
         if (!cancelled) setPayload(data);
       } catch (e) {

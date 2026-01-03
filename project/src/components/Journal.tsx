@@ -16,6 +16,7 @@ import {
 import dayjs from "dayjs";
 import { useAuth } from "../contexts/AuthContext";
 import type { Database } from "../lib/database.types";
+import { API_URL } from "../config";
 
 type CropJournal = Database["public"]["Tables"]["crop_journal"]["Row"];
 
@@ -67,7 +68,7 @@ export default function Journal({ onNavigate }: JournalProps) {
     setLoading(true);
     try {
       const token = localStorage.getItem(TOKEN_KEY);
-      const res = await fetch(`/api/journal`, {
+      const res = await fetch(`${API_URL}/api/journal`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -93,7 +94,7 @@ export default function Journal({ onNavigate }: JournalProps) {
     const token = localStorage.getItem(TOKEN_KEY);
 
     try {
-      const url = editingEntry ? `/api/journal/${editingEntry.id}` : "/api/journal";
+      const url = editingEntry ? `${API_URL}/api/journal/${editingEntry.id}` : `${API_URL}/api/journal`;
       const method = editingEntry ? "PUT" : "POST";
 
       const res = await fetch(url, {
@@ -144,7 +145,7 @@ export default function Journal({ onNavigate }: JournalProps) {
 
     const token = localStorage.getItem(TOKEN_KEY);
     try {
-      const res = await fetch(`/api/journal/${entry.id}`, {
+      const res = await fetch(`${API_URL}/api/journal/${entry.id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 import { getWeatherImage } from "../utils/weatherImage";
 import WeatherMap from "./WeatherMap";
+import { API_URL } from "../config";
 
 /* =====================
    TYPES
@@ -181,7 +182,7 @@ export default function Weather({ onNavigate }: WeatherProps) {
      FETCH "refresh" => gives locationId
   ===================== */
   async function fetchWeatherRefresh(lat: number, lon: number, placeName: string) {
-    const res = await fetch("/api/weather/refresh", {
+    const res = await fetch(`${API_URL}/api/weather/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ latitude: lat, longitude: lon, place_name: placeName }),
@@ -305,9 +306,9 @@ export default function Weather({ onNavigate }: WeatherProps) {
       // Online => API then cache
       try {
         const [cur, hour, day] = await Promise.all([
-          fetch(`/api/weather/current/${locationId}`).then((r) => r.json()),
-          fetch(`/api/weather/hourly/${locationId}`).then((r) => r.json()),
-          fetch(`/api/weather/daily/${locationId}`).then((r) => r.json()),
+          fetch(`${API_URL}/api/weather/current/${locationId}`).then((r) => r.json()),
+          fetch(`${API_URL}/api/weather/hourly/${locationId}`).then((r) => r.json()),
+          fetch(`${API_URL}/api/weather/daily/${locationId}`).then((r) => r.json()),
         ]);
 
         if (cancelled) return;

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "../contexts/AuthContext";
+import { API_URL } from "../config";
 
 type CurrentWeather = {
   temperature: number;
@@ -160,10 +161,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
       try {
         const [curRes, hourRes, adviceRes, alertsRes] = await Promise.all([
-          fetch(`/api/weather/current/${id}`),
-          fetch(`/api/weather/hourly/${id}`),
-          fetch(`/api/advice/by-weather/${id}?limit=1`),
-          fetch(`/api/alerts/by-weather/${id}?limit=1`),
+          fetch(`${API_URL}/api/weather/current/${id}`),
+          fetch(`${API_URL}/api/weather/hourly/${id}`),
+          fetch(`${API_URL}/api/advice/by-weather/${id}?limit=1`),
+          fetch(`${API_URL}/api/alerts/by-weather/${id}?limit=1`),
         ]);
 
         const cur: CurrentWeather | null = curRes.ok ? await curRes.json() : null;

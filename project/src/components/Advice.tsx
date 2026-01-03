@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, BookOpen, Sprout, Leaf, Wind, CloudRain, Sun, Filter } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { API_URL } from "../config";
 
 interface AdviceProps {
   onNavigate: (screen: string) => void;
@@ -126,7 +127,7 @@ export default function Advice({ onNavigate }: AdviceProps) {
         if (selectedCrop !== "all") qs.set("crop_type", selectedCrop);
         if (selectedSeason !== "all") qs.set("season", selectedSeason);
 
-        const url = `/api/advice/by-weather/${id}?${qs.toString()}`;
+        const url = `${API_URL}/api/advice/by-weather/${id}?${qs.toString()}`;
         const res = await fetch(url);
         const data: AdvicePayload = res.ok ? await res.json() : { meta: null, advices: [] };
 
