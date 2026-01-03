@@ -89,30 +89,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, fullName?: string, regionId?: string, phone?: string) => {
     try {
+      const payload: any = { email, password, full_name: fullName, phone };
+      if (regionId) payload.region_id = regionId;
+
       const res = await fetch(`${API_BASE}/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, full_name: fullName, region_id: regionId, phone }),
+        body: JSON.stringify(payload),
       });
+
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         return { error: body.error || 'Signup failed' };
       }
+
       const data = await res.json();
       localStorage.setItem(TOKEN_KEY, data.token);
       setUser({ id: data.user.id, email: data.user.email });
+
       const p = await fetch(`${API_BASE}/api/profiles/me`, { headers: { Authorization: `Bearer ${data.token}` } });
       if (p.ok) {
         const profileData = await p.json();
         setProfile(profileData);
         if (profileData?.region) setRegion(profileData.region as Region);
       }
+
       return { error: null };
     } catch (err) {
       console.error(err);
       return { error: 'Signup error' };
     }
   };
+
 
   const signOut = () => {
     localStorage.removeItem(TOKEN_KEY);

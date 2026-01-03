@@ -1,10 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState} from 'react';
 import { UserPlus, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import type { Database } from '../lib/database.types';
-import { API_URL } from "../config";
 
-type Region = Database['public']['Tables']['regions']['Row'];
 
 interface RegisterProps {
   onShowLogin: () => void;
@@ -12,40 +9,18 @@ interface RegisterProps {
 
 export default function Register({ onShowLogin }: RegisterProps) {
   const { signUp } = useAuth();
-  const [regions, setRegions] = useState<Region[]>([]);
-  const [regionsLoading, setRegionsLoading] = useState(true);
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
     password: '',
     confirmPassword: '',
-    regionId: '',
     phone: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  useEffect(() => {
-    loadRegions();
-  }, []);
-
-  async function loadRegions() {
-    setRegionsLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/api/regions`);
-      if (res.ok) {
-        const data = await res.json();
-        setRegions(data || []);
-      } else {
-        console.error('Load regions failed', res.status);
-      }
-    } catch (err) {
-      console.error('Load regions error', err);
-    } finally {
-      setRegionsLoading(false);
-    }
-  }
+  
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,17 +33,12 @@ export default function Register({ onShowLogin }: RegisterProps) {
       return;
     }
 
-    if (!formData.regionId) {
-      setError('Mifidiana faritra');
-      setLoading(false);
-      return;
-    }
 
     const { error } = await signUp(
       formData.email,
       formData.password,
       formData.fullName,
-      formData.regionId,
+      undefined,
       formData.phone
     );
 
@@ -163,40 +133,6 @@ export default function Register({ onShowLogin }: RegisterProps) {
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-lg"
                 disabled={loading}
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Faritra
-              </label>
-              <select
-                value={formData.regionId}
-                onChange={(e) =>
-                  setFormData({ ...formData, regionId: e.target.value })
-                }
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-lg"
-                required
-                disabled={loading || regionsLoading}
-              >
-                {regionsLoading ? (
-                  <option value="">Loading regions...</option>
-                ) : (
-                  <>
-                    <option value="" disabled>
-                      Mifidiana faritra
-                    </option>
-                    {regions.length === 0 ? (
-                      <option value="" disabled>Tsy misy faritra azo alaina</option>
-                    ) : (
-                      regions.map((region) => (
-                        <option key={region.id} value={region.id}>
-                          {region.name}
-                        </option>
-                      ))
-                    )}
-                  </>
-                )}
-              </select>
             </div>
 
             <div>
