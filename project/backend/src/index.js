@@ -7,6 +7,12 @@ const pool = require("./db");
 const { fetchWeatherForLocation } = require("./fetchWeather");
 
 dotenv.config();
+console.log("ENV DB =>", {
+    DB_HOST: process.env.DB_HOST,
+    DB_PORT: process.env.DB_PORT,
+    DB_USER: process.env.DB_USER,
+    DB_NAME: process.env.DB_NAME,
+});
 
 const app = express();
 app.use(cors());
@@ -329,6 +335,63 @@ app.post("/api/journal", verifyJWT, async (req, res) => {
     res.json({ ok: true });
 });
 
+// UPDATE journal
+app.put("/api/journal/:id", verifyJWT, async (req, res) => {
+    const { id } = req.params;
+    const { observation_date, observation_type, crop_type, notes_mg } = req.body;
+
+    if (!observation_date || !observation_type) {
+        return res.status(400).json({ error: "Missing fields" });
+    }
+
+    try {
+        const result = await pool.query(
+            `UPDATE crop_journal
+       SET observation_date = ?, observation_type = ?, crop_type = ?, notes_mg = ?
+       WHERE id = ? AND user_id = ?`,
+            [observation_date, observation_type, crop_type ?? null, notes_mg ?? null, id, req.user.id]
+        );
+
+        const affected = result?.affectedRows ?? result?.[0]?.affectedRows;
+        if (!affected) return res.status(404).json({ error: "Journal not found" });
+
+        const row = await pool.query(
+            "SELECT * FROM crop_journal WHERE id = ? AND user_id = ?",
+            [id, req.user.id]
+        );
+
+        res.json(row?.[0] ?? row?.[0]?.[0] ?? null);
+    } catch (e) {
+        console.error("Update journal error", e);
+        res.status(500).json({ error: "Update failed" });
+    }
+});
+
+
+// DELETE journal
+app.delete("/api/journal/:id", verifyJWT, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const result = await pool.query(
+            "DELETE FROM crop_journal WHERE id = ? AND user_id = ?",
+            [id, req.user.id]
+        );
+
+        const affected = result?.affectedRows ?? result?.[0]?.affectedRows;
+        if (!affected) return res.status(404).json({ error: "Journal not found" });
+
+        res.json({ ok: true });
+    } catch (e) {
+        console.error("Delete journal error", e);
+        res.status(500).json({ error: "Delete failed" });
+    }
+});
+
+
+
+
+
 app.get("/api/advice/by-weather/:locationId", async (req, res) => {
     const { locationId } = req.params;
     const limit = Math.min(parseInt(req.query.limit || "20", 10) || 20, 50);
@@ -476,6 +539,8 @@ app.get("/api/alerts/by-weather/:locationId", async (req, res) => {
         return res.status(500).json({ error: "Failed to load alerts" });
     }
 });
+
+app.get("/api/ping", (req, res) => res.json({ ok: true, time: Date.now() }));
 
 /* =========================
    START SERVER
