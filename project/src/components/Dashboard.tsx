@@ -15,22 +15,25 @@ import {
 
 import { useAuth } from "../contexts/AuthContext";
 import { API_URL } from "../config";
+import { readAdviceCache, readAlertsCache } from "../offline/cache";
+
 
 type CurrentWeather = {
   temperature: number;
   condition: string;
   icon: string | number;
-  place_name: string;
+  placename: string;     // au lieu de placename
   time: string;
 };
 
 type HourlyWeather = {
-  forecast_time: string;
+  forecasttime: string;  // au lieu de forecast_time
   temp: number;
   wind: number;
   humidity: number;
   condition?: string;
 };
+
 
 type AdviceRow = {
   id: string;
@@ -60,6 +63,30 @@ type AlertsPayload = {
   meta: any;
   alerts: AlertRow[];
 };
+
+const CACHE_PREFIX = "weathercache:";
+
+type WeatherCache = {
+  savedAt: number;
+  locationId: string;
+  coords: any | null;
+  current: CurrentWeather | null;
+  hourly: HourlyWeather[];
+  daily: any[];
+};
+
+function safeParseJSON<T>(raw: string | null): T | null {
+  try {
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+function readWeatherCache(locationId: string): WeatherCache | null {
+  return safeParseJSON<WeatherCache>(localStorage.getItem(CACHE_PREFIX + locationId));
+}
+
 
 interface DashboardProps {
   onNavigate: (screen: string) => void;
@@ -160,6 +187,31 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       if (!cancelled) setLoading(true);
 
       try {
+        // 1) OFFLINE-FIRST: météo depuis localStorage
+        const wc = readWeatherCache(id);
+        if (wc?.current && !cancelled) {
+          setCurrent(wc.current);
+          setNextHour(wc.hourly?.[0] ?? null);
+        }
+
+        // 2) OFFLINE-FIRST: advice/alerts depuis IndexedDB (mêmes keys que tes pages)
+        const adviceKey = `advice:${id}:${new URLSearchParams({ limit: "50" }).toString()}`;
+        const alertsKey = `alerts:${id}:${new URLSearchParams({ limit: "3" }).toString()}`;
+
+        const [adviceCached, alertsCached] = await Promise.all([
+          readAdviceCache(adviceKey),
+          readAlertsCache(alertsKey),
+        ]);
+
+        if (!cancelled) {
+          setAdviceTop(adviceCached?.advices?.[0] ?? null);
+          setAlertTop(alertsCached?.alerts?.[0] ?? null);
+        }
+
+        // 3) Si offline: on stop ici (on garde l’affichage cache)
+        if (!navigator.onLine) return;
+
+        // 4) Online: on refresh depuis API (comme avant)
         const [curRes, hourRes, adviceRes, alertsRes] = await Promise.all([
           fetch(`${API_URL}/api/weather/current/${id}`),
           fetch(`${API_URL}/api/weather/hourly/${id}`),
@@ -180,6 +232,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         setAlertTop(alertsPayload?.alerts?.[0] ?? null);
       } catch (e) {
         console.error("Dashboard load error", e);
+
+        // important: ne pas vider si offline (car on a peut-être déjà affiché le cache)
+        if (!cancelled && !navigator.onLine) return;
+
         if (!cancelled) {
           setCurrent(null);
           setNextHour(null);
@@ -196,6 +252,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       cancelled = true;
     };
   }, [locationId]);
+
 
   if (loading) {
     return (
@@ -229,7 +286,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               </div>
               <div className="text-sm text-slate-600">
                 {region?.name || "Faritra"}
-                {current?.place_name ? ` • ${current.place_name}` : ""}
+                {current?.placename ? ` • ${current.placename}` : ""}
               </div>
 
               <div className="mt-2 flex flex-wrap gap-2">
@@ -269,7 +326,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                 {current ? `${conditionLabel} • ${current.temperature}°` : "Safidio toerana"}
               </div>
               <div className="text-sm text-slate-600 mt-1">
-                {current ? current.place_name : "Mandehana any amin’ny Toetrandro hisafidy tanàna."}
+                {current ? current.placename : "Mandehana any amin’ny Toetrandro hisafidy tanàna."}
               </div>
             </div>
 
@@ -362,7 +419,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                   {getWeatherIcon(current.condition)}
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm text-slate-600">{current.place_name}</div>
+                  <div className="text-sm text-slate-600">{current.placename}</div>
                   <div className="text-4xl font-bold text-slate-900">{current.temperature}°</div>
                   <div className="text-slate-700 mt-1">{conditionLabel}</div>
 

@@ -12,6 +12,8 @@ import {
 
 import { useAuth } from "../contexts/AuthContext";
 import { API_URL } from "../config";
+import { readAlertsCache, writeAlertsCache } from "../offline/cache";
+
 
 type WeatherAlertRow = {
   id: string;
@@ -78,6 +80,7 @@ export default function Alerts({ onNavigate }: AlertsProps) {
 
   useEffect(() => {
     let cancelled = false;
+    let interval: number | undefined;
 
     async function load() {
       const id = locationId || localStorage.getItem(LAST_LOCATION_KEY);
@@ -93,11 +96,29 @@ export default function Alerts({ onNavigate }: AlertsProps) {
       if (!cancelled) setLoading(true);
 
       try {
-        const res = await fetch(`${API_URL}/api/alerts/by-weather/${id}?limit=3`);
-        const data: AlertsPayload = res.ok ? await res.json() : { meta: null, alerts: [] };
+        const limit = 3;
+        const qs = new URLSearchParams({ limit: String(limit) });
+        const cacheKey = `alerts:${id}:${qs.toString()}`;
+        const url = `${API_URL}/api/alerts/by-weather/${id}?${qs.toString()}`;
+
+        // 1) Lire cache d'abord
+        const cached = await readAlertsCache(cacheKey);
+        if (cached && !cancelled) setPayload(cached);
+
+        // 2) Offline => stop (on garde l'affichage du cache)
+        if (!navigator.onLine) return;
+
+        // 3) Online => fetch + write cache
+        const res = await fetch(url);
+        const data = (res.ok ? await res.json() : { meta: null, alerts: [] }) as AlertsPayload;
+
+        await writeAlertsCache(cacheKey, data);
+
         if (!cancelled) setPayload(data);
       } catch (e) {
         console.error("Load alerts error", e);
+        // Important: ne pas vider si on avait un cache affiché
+        if (!cancelled && !navigator.onLine) return;
         if (!cancelled) setPayload({ meta: null, alerts: [] });
       } finally {
         if (!cancelled) setLoading(false);
@@ -105,12 +126,18 @@ export default function Alerts({ onNavigate }: AlertsProps) {
     }
 
     load();
-    const interval = window.setInterval(load, 60_000);
+
+    // Polling seulement si online
+    if (navigator.onLine) {
+      interval = window.setInterval(load, 60_000);
+    }
+
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
+      if (interval) window.clearInterval(interval);
     };
   }, [locationId]);
+
 
   const alerts = payload.alerts ?? [];
   const placeName = payload.meta?.place_name;

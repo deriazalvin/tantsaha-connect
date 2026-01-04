@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, BookOpen, Sprout, Leaf, Wind, CloudRain, Sun, Filter } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { API_URL } from "../config";
+import { readAdviceCache, writeAdviceCache } from "../offline/cache";
 
 interface AdviceProps {
   onNavigate: (screen: string) => void;
@@ -121,21 +122,35 @@ export default function Advice({ onNavigate }: AdviceProps) {
       try {
         const qs = new URLSearchParams();
         qs.set("limit", "50");
-
-        // Ton backend semble utiliser croptype/season selon versions;
-        // ici on envoie crop_type et season (si ton backend utilise croptype, dis-moi et j’adapte).
         if (selectedCrop !== "all") qs.set("crop_type", selectedCrop);
         if (selectedSeason !== "all") qs.set("season", selectedSeason);
 
+        const cacheKey = `advice:${id}:${qs.toString()}`;
         const url = `${API_URL}/api/advice/by-weather/${id}?${qs.toString()}`;
-        const res = await fetch(url);
-        const data: AdvicePayload = res.ok ? await res.json() : { meta: null, advices: [] };
 
-        if (cancelled) return;
-        setMeta(data.meta ?? null);
-        setAdvices(data.advices ?? []);
+        // 1) Lire cache d'abord
+        const cached = await readAdviceCache(cacheKey);
+        if (cached && !cancelled) {
+          setMeta(cached.meta ?? null);
+          setAdvices(cached.advices ?? []);
+        }
+
+        // 2) Offline => stop (on garde cache)
+        if (!navigator.onLine) return;
+
+        // 3) Online => fetch + write cache
+        const res = await fetch(url);
+        const data = (res.ok ? await res.json() : { meta: null, advices: [] }) as AdvicePayload;
+
+        await writeAdviceCache(cacheKey, data);
+
+        if (!cancelled) {
+          setMeta(data.meta ?? null);
+          setAdvices(data.advices ?? []);
+        }
       } catch (err) {
         console.error("Load advices error", err);
+        if (!cancelled && !navigator.onLine) return;
         if (!cancelled) {
           setMeta(null);
           setAdvices([]);
@@ -146,10 +161,13 @@ export default function Advice({ onNavigate }: AdviceProps) {
     }
 
     load();
+
     return () => {
       cancelled = true;
     };
   }, [locationId, selectedCrop, selectedSeason]);
+
+
 
   const cropTypes = useMemo(() => {
     const types = new Set(
