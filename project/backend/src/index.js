@@ -1,3 +1,5 @@
+console.log("BOOT MARKER => 2026-01-04T16:50Z");
+
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
@@ -15,26 +17,26 @@ console.log("ENV DB =>", {
 });
 
 const app = express();
-const cors = require("cors");
 
-const allowedOrigins = [
-    "http://localhost:5173",
-    "https://tantsaha-connect.vercel.app",
-    "https://tantsaha-connect-beta.vercel.app/",
-];
+const isAllowed = (origin) => {
+    if (!origin) return true;
+
+    if (origin === "https://tantsaha-connect.vercel.app") return true;
+    if (origin === "https://tantsaha-connect-beta.vercel.app") return true;
+
+    // autorise les previews Vercel de ton projet (adapter le pattern au tien)
+    if (/^https:\/\/tantsaha-connect-.*\.vercel\.app$/.test(origin)) return true;
+
+    return false;
+};
 
 app.use(cors({
-    origin: (origin, cb) => {
-        if (!origin) return cb(null, true);
-        if (allowedOrigins.includes(origin)) return cb(null, true);
-        return cb(null, false); // important: ne pas throw ici
-    },
+    origin: (origin, cb) => cb(null, isAllowed(origin)),
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
 }));
-
-// Répondre à tous les preflights
 app.options("*", cors());
+
 
 app.use(express.json());
 
