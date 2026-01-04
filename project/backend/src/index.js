@@ -15,7 +15,27 @@ console.log("ENV DB =>", {
 });
 
 const app = express();
-app.use(cors());
+const cors = require("cors");
+
+const allowedOrigins = [
+    "http://localhost:5173",
+    "https://tantsaha-connect.vercel.app",
+    "https://tantsaha-connect-beta.vercel.app/",
+];
+
+app.use(cors({
+    origin: (origin, cb) => {
+        if (!origin) return cb(null, true);
+        if (allowedOrigins.includes(origin)) return cb(null, true);
+        return cb(null, false); // important: ne pas throw ici
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+}));
+
+// Répondre à tous les preflights
+app.options("*", cors());
+
 app.use(express.json());
 
 const PORT = process.env.PORT || 4000;
