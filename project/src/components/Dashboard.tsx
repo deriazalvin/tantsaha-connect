@@ -161,6 +161,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     return conditionMG[current.condition] || current.condition;
   }, [current]);
 
+  const [showUpload, setShowUpload] = useState(false);
+
+
   useEffect(() => {
     const handler = () => setLocationId(localStorage.getItem(LAST_LOCATION_KEY));
     window.addEventListener("storage", handler);
@@ -268,17 +271,20 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       <header className="border-b border-white/60 bg-white/70 backdrop-blur">
         <div className="max-w-6xl mx-auto px-4 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center overflow-hidden shadow-sm">
-              {profile?.profile_photo_url ? (
-                <img
-                  src={profile.profile_photo_url}
-                  alt={profile.full_name || "Profile"}
-                  className="w-12 h-12 object-cover"
-                />
-              ) : (
-                <User className="w-6 h-6" />
-              )}
-            </div>
+            <button onClick={() => setShowUpload(true)}>
+              <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center overflow-hidden shadow-sm">
+                {profile?.profile_photo_url ? (
+                  <img
+                    src={`${API_URL}${profile.profile_photo_url}`}
+                    className="w-12 h-12 object-cover"
+                  />
+                ) : (
+                  <User className="w-6 h-6" />
+                )}
+              </div>
+            </button>
+
+
 
             <div>
               <div className="text-lg font-bold text-slate-900 leading-tight">

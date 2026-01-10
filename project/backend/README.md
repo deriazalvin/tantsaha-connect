@@ -33,7 +33,7 @@ npm run dev
 - `GET /api/weather/:region_id/:date` (date format YYYY-MM-DD)
 - `GET /api/alerts/:region_id`
 - `GET /api/advice/:region_id`
-- `GET /api/profiles/me` (requires Supabase Authorization header)
+- `GET /api/users/me` (requires Supabase Authorization header)
 - `GET /api/journal` (requires Supabase Authorization header)
 - `POST /api/journal` (requires Supabase Authorization header)
 

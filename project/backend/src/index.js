@@ -104,9 +104,14 @@ app.post("/auth/signup", async (req, res) => {
         );
 
         await pool.query(
-            "INSERT INTO profiles (id, full_name) VALUES (?, ?)",
-            [user.id, full_name || ""]
+            `
+            UPDATE users
+            SET full_name = ?
+            WHERE id = ?
+            `,
+            [full_name || null, user.id]
         );
+
 
         const token = jwt.sign({ id: user.id, email }, JWT_SECRET, {
             expiresIn: "7d",
@@ -297,33 +302,66 @@ app.get("/api/weather/daily/:locationId", async (req, res) => {
 /* =========================
    PROFILE
 ========================= */
-app.get("/api/profiles/me", verifyJWT, async (req, res) => {
-    const [[profile]] = await pool.query(
-        "SELECT * FROM profiles WHERE id = ?",
+app.get("/api/users/me", verifyJWT, async (req, res) => {
+    const [rows] = await pool.query(
+        `
+    SELECT 
+      u.id,
+      u.email,
+      u.full_name,
+      u.phone,
+      u.profile_photo_url,
+      r.id AS region_id,
+      r.name AS region_name
+    FROM users u
+    LEFT JOIN regions r ON r.id = u.region_id
+    WHERE u.id = ?
+    `,
         [req.user.id]
     );
-    res.json(profile || null);
+
+    if (!rows.length) {
+        return res.status(404).json({ error: "Utilisateur introuvable" });
+    }
+
+    const u = rows[0];
+
+    res.json({
+        id: u.id,
+        email: u.email,
+        full_name: u.full_name,
+        phone: u.phone,
+        profile_photo_url: u.profile_photo_url,
+        region: u.region_id
+            ? { id: u.region_id, name: u.region_name }
+            : null,
+    });
 });
 
-app.post("/api/profiles", verifyJWT, async (req, res) => {
+app.post("/api/users/profile", verifyJWT, async (req, res) => {
     const { full_name, phone } = req.body;
 
     await pool.query(
         `
-        UPDATE profiles
-        SET full_name = ?, phone = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-        `,
+    UPDATE users
+    SET full_name = ?, phone = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+    `,
         [full_name, phone, req.user.id]
     );
 
-    const [[profile]] = await pool.query(
-        "SELECT * FROM profiles WHERE id = ?",
+    const [[user]] = await pool.query(
+        `
+    SELECT id, email, full_name, phone, profile_photo_url
+    FROM users
+    WHERE id = ?
+    `,
         [req.user.id]
     );
 
-    res.json(profile);
+    res.json(user);
 });
+
 
 /* =========================
    JOURNAL
@@ -561,12 +599,16 @@ app.get("/api/alerts/by-weather/:locationId", async (req, res) => {
         return res.status(500).json({ error: "Failed to load alerts" });
     }
 });
+const uploadRouter = require("./middlewars/upload")
+app.use('/api', uploadRouter);
+app.use("/uploads", express.static("uploads"));
+const profilePhotoRouter = require("./routes/profilePhoto");
+
+app.use("/api", profilePhotoRouter);
+app.use("/uploads", express.static("uploads"));
+
 
 app.get("/api/ping", (req, res) => res.json({ ok: true, time: Date.now() }));
-
-/* =========================
-   START SERVER
-========================= */
 app.listen(PORT, () => {
     console.log(` Backend running on port ${PORT}`);
 });

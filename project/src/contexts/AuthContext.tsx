@@ -1,19 +1,39 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { Database } from '../lib/database.types';
 
-type Profile = Database['public']['Tables']['profiles']['Row'];
+type UserProfile = {
+  id: string;
+  email: string;
+  full_name?: string | null;
+  phone?: string | null;
+  profile_photo_url?: string | null;
+  region?: {
+    id: string;
+    name: string;
+  } | null;
+};
+
 type Region = Database['public']['Tables']['regions']['Row'];
 
 interface AuthContextType {
   user: { id: string; email?: string } | null;
-  profile: Profile | null;
+  profile: UserProfile | null;
   region: Region | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error?: string | null }>;
-  signUp: (email: string, password: string, fullName?: string, regionId?: string, phone?: string) => Promise<{ error?: string | null }>;
+
+  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    fullName?: string,
+    phone?: string
+  ) => Promise<{ error: string | null }>;
   signOut: () => void;
-  updateProfile: (updates: Partial<Profile>) => Promise<{ error?: string | null }>;
+
+  updateProfile: (updates: Partial<UserProfile>) => Promise<{ error: string | null }>;
 }
+
+
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -22,7 +42,7 @@ const TOKEN_KEY = 'tantsaha_token';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<{ id: string; email?: string } | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [region, setRegion] = useState<Region | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -35,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/profiles/me`, {
+        const res = await fetch(`${API_BASE}/api/users/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) {
@@ -74,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(TOKEN_KEY, data.token);
       setUser({ id: data.user.id, email: data.user.email });
       // load profile (API returns nested region)
-      const p = await fetch(`${API_BASE}/api/profiles/me`, { headers: { Authorization: `Bearer ${data.token}` } });
+      const p = await fetch(`${API_BASE}/api/users/me`, { headers: { Authorization: `Bearer ${data.token}` } });
       if (p.ok) {
         const profileData = await p.json();
         setProfile(profileData);
@@ -87,11 +107,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, fullName?: string, regionId?: string, phone?: string) => {
+  const signUp = async (email: string, password: string, fullName?: string, phone?: string) => {
     try {
       const payload: any = { email, password, full_name: fullName, phone };
-      if (regionId) payload.region_id = regionId;
-
       const res = await fetch(`${API_BASE}/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -107,7 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(TOKEN_KEY, data.token);
       setUser({ id: data.user.id, email: data.user.email });
 
-      const p = await fetch(`${API_BASE}/api/profiles/me`, { headers: { Authorization: `Bearer ${data.token}` } });
+      const p = await fetch(`${API_BASE}/api/users/me`, { headers: { Authorization: `Bearer ${data.token}` } });
       if (p.ok) {
         const profileData = await p.json();
         setProfile(profileData);
@@ -129,11 +147,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setRegion(null);
   };
 
-  const updateProfile = async (updates: Partial<Profile>) => {
+  const updateProfile = async (updates: Partial<UserProfile>) => {
     const token = localStorage.getItem(TOKEN_KEY);
     if (!token) return { error: 'Not authenticated' };
     try {
-      const res = await fetch(`${API_BASE}/api/profiles`, {
+      const res = await fetch(`${API_BASE}/api/users/profile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(updates),
@@ -144,17 +162,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       const updated = await res.json();
       setProfile(updated);
-      if (updates.region_id) {
-        // fetch updated profile to get the nested region object
-        const token = localStorage.getItem(TOKEN_KEY);
-        if (token) {
-          const p = await fetch(`${API_BASE}/api/profiles/me`, { headers: { Authorization: `Bearer ${token}` } });
-          if (p.ok) {
-            const profileData = await p.json();
-            if (profileData?.region) setRegion(profileData.region as Region);
-          }
-        }
-      }
       return { error: null };
     } catch (err) {
       console.error(err);
