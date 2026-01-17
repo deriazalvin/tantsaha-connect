@@ -8,7 +8,7 @@ const pool = require("../db");
 router.post(
     "/profile/photo",
     verifyJWT,
-    upload.single("photo"),
+    upload.single("photo"), // juste "photo", pas de second argument
     async (req, res) => {
         try {
             if (!req.file) {
@@ -22,9 +22,7 @@ router.post(
                 [photoUrl, req.user.id]
             );
 
-            res.json({
-                profile_photo_url: photoUrl,
-            });
+            res.json({ profile_photo_url: photoUrl });
         } catch (err) {
             console.error(err);
             res.status(500).json({ error: "Erreur serveur" });
@@ -32,4 +30,4 @@ router.post(
     }
 );
 
-module.exports = router;
+module.exports = router; // important !

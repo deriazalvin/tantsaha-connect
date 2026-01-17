@@ -9,6 +9,7 @@ const pool = require("./db");
 const { fetchWeatherForLocation } = require("./fetchWeather");
 
 dotenv.config();
+
 console.log("ENV DB =>", {
     DB_HOST: process.env.DB_HOST,
     DB_PORT: process.env.DB_PORT,
@@ -17,16 +18,17 @@ console.log("ENV DB =>", {
 });
 
 const app = express();
+const PORT = process.env.PORT || 4000;
+const JWT_SECRET = process.env.JWT_SECRET || "change_me";
 
+// =========================
+// MIDDLEWARES
+// =========================
 const isAllowed = (origin) => {
     if (!origin) return true;
-
     if (origin === "https://tantsaha-connect.vercel.app") return true;
     if (origin === "https://tantsaha-connect-beta.vercel.app") return true;
-
-    // autorise les previews Vercel de ton projet (adapter le pattern au tien)
     if (/^https:\/\/tantsaha-connect-.*\.vercel\.app$/.test(origin)) return true;
-
     return false;
 };
 
@@ -37,15 +39,26 @@ app.use(cors({
 }));
 app.options("*", cors());
 
-
 app.use(express.json());
 
-const PORT = process.env.PORT || 4000;
-const JWT_SECRET = process.env.JWT_SECRET || "change_me";
+// =========================
+// JWT VERIFY MIDDLEWARE
+// =========================
+function verifyJWT(req, res, next) {
+    const auth = req.headers.authorization;
+    if (!auth || !auth.startsWith("Bearer ")) return res.status(401).json({ error: "Unauthorized" });
 
-/* =========================
-   UTILS
-========================= */
+    try {
+        req.user = jwt.verify(auth.slice(7), JWT_SECRET);
+        next();
+    } catch {
+        return res.status(401).json({ error: "Invalid token" });
+    }
+}
+
+// =========================
+// UTILS
+// =========================
 function mapWeatherCode(code) {
     if (code === 0) return "Clear";
     if ([1, 2, 3].includes(code)) return "Cloudy";
@@ -56,66 +69,26 @@ function mapWeatherCode(code) {
     return "Unknown";
 }
 
-/* =========================
-   AUTH MIDDLEWARE
-========================= */
-function verifyJWT(req, res, next) {
-    const auth = req.headers.authorization;
-    if (!auth || !auth.startsWith("Bearer ")) {
-        return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    try {
-        req.user = jwt.verify(auth.slice(7), JWT_SECRET);
-        next();
-    } catch {
-        return res.status(401).json({ error: "Invalid token" });
-    }
-}
-
-/* =========================
-   AUTH
-========================= */
+// =========================
+// AUTH ROUTES
+// =========================
 app.post("/auth/signup", async (req, res) => {
     const { email, password, full_name } = req.body;
-    if (!email || !password) {
-        return res.status(400).json({ error: "Missing fields" });
-    }
+    if (!email || !password) return res.status(400).json({ error: "Missing fields" });
 
     try {
-        const [exists] = await pool.query(
-            "SELECT id FROM users WHERE email = ?",
-            [email]
-        );
-        if (exists.length) {
-            return res.status(400).json({ error: "User exists" });
-        }
+        const [exists] = await pool.query("SELECT id FROM users WHERE email = ?", [email]);
+        if (exists.length) return res.status(400).json({ error: "User exists" });
 
         const hash = await bcrypt.hash(password, 10);
 
-        await pool.query(
-            "INSERT INTO users (id, email, password_hash) VALUES (UUID(), ?, ?)",
-            [email, hash]
-        );
+        await pool.query("INSERT INTO users (id, email, password_hash) VALUES (UUID(), ?, ?)", [email, hash]);
 
-        const [[user]] = await pool.query(
-            "SELECT id FROM users WHERE email = ?",
-            [email]
-        );
+        const [[user]] = await pool.query("SELECT id FROM users WHERE email = ?", [email]);
 
-        await pool.query(
-            `
-            UPDATE users
-            SET full_name = ?
-            WHERE id = ?
-            `,
-            [full_name || null, user.id]
-        );
+        await pool.query("UPDATE users SET full_name = ? WHERE id = ?", [full_name || null, user.id]);
 
-
-        const token = jwt.sign({ id: user.id, email }, JWT_SECRET, {
-            expiresIn: "7d",
-        });
+        const token = jwt.sign({ id: user.id, email }, JWT_SECRET, { expiresIn: "7d" });
 
         res.json({ token, user });
     } catch (e) {
@@ -128,23 +101,14 @@ app.post("/auth/login", async (req, res) => {
     const { email, password } = req.body;
 
     try {
-        const [[user]] = await pool.query(
-            "SELECT * FROM users WHERE email = ?",
-            [email]
-        );
+        const [[user]] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
 
-        if (!user) {
-            return res.status(401).json({ error: "Invalid credentials" });
-        }
+        if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
         const ok = await bcrypt.compare(password, user.password_hash);
-        if (!ok) {
-            return res.status(401).json({ error: "Invalid credentials" });
-        }
+        if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
-        const token = jwt.sign({ id: user.id, email }, JWT_SECRET, {
-            expiresIn: "7d",
-        });
+        const token = jwt.sign({ id: user.id, email }, JWT_SECRET, { expiresIn: "7d" });
 
         res.json({ token, user: { id: user.id, email } });
     } catch (e) {
@@ -153,30 +117,19 @@ app.post("/auth/login", async (req, res) => {
     }
 });
 
-/* =========================
-   WEATHER API
-========================= */
-
-/**
- * REFRESH WEATHER (Open-Meteo)
- */
+// =========================
+// WEATHER ROUTES
+// =========================
 app.post("/api/weather/refresh", async (req, res) => {
     const { latitude, longitude, place_name, placename, region, country } = req.body || {};
     const finalPlaceName = place_name || placename;
 
-    // Validation dure (empêche l'insert NULL)
     if (typeof latitude !== "number" || typeof longitude !== "number" || !finalPlaceName) {
         return res.status(400).json({ error: "Missing location data" });
     }
 
     try {
-        const result = await fetchWeatherForLocation({
-            latitude,
-            longitude,
-            place_name: finalPlaceName,
-            region,
-            country,
-        });
+        const result = await fetchWeatherForLocation({ latitude, longitude, place_name: finalPlaceName, region, country });
         return res.json(result);
     } catch (e) {
         console.error(e);
@@ -184,35 +137,18 @@ app.post("/api/weather/refresh", async (req, res) => {
     }
 });
 
-
-
-
-/**
- * CURRENT WEATHER
- */
 app.get("/api/weather/current/:locationId", async (req, res) => {
     const { locationId } = req.params;
-
-    const [[row]] = await pool.query(
-        `
-    SELECT
-      w.temperature,
-      w.weather_code,
-      w.forecast_time AS time,
-      l.place_name
+    const [[row]] = await pool.query(`
+    SELECT w.temperature, w.weather_code, w.forecast_time AS time, l.place_name
     FROM weather_hourly w
     JOIN weather_locations l ON l.id = w.location_id
     WHERE w.location_id = ?
     ORDER BY w.forecast_time DESC
     LIMIT 1
-    `,
-        [locationId]
-    );
+  `, [locationId]);
 
-    if (!row) {
-        console.log("⚠️ No current weather found for", locationId);
-        return res.json(null);
-    }
+    if (!row) return res.json(null);
 
     function codeToCondition(code) {
         if (code === 0) return "Clear";
@@ -233,31 +169,15 @@ app.get("/api/weather/current/:locationId", async (req, res) => {
     });
 });
 
-
-/**
- * HOURLY (TODAY)
- */
 app.get("/api/weather/hourly/:locationId", async (req, res) => {
     const { locationId } = req.params;
-
     try {
-        const [rows] = await pool.query(
-            `
-            SELECT
-                forecast_time,
-                temperature AS temp,
-                wind_speed AS wind,
-                humidity,
-                weather_code
-            FROM weather_hourly
-            WHERE location_id = ?
-              AND forecast_time >= NOW()
-              AND forecast_time <= DATE_ADD(NOW(), INTERVAL 24 HOUR)
-            ORDER BY forecast_time
-            `,
-            [locationId]
-        );
-
+        const [rows] = await pool.query(`
+      SELECT forecast_time, temperature AS temp, wind_speed AS wind, humidity, weather_code
+      FROM weather_hourly
+      WHERE location_id = ? AND forecast_time >= NOW() AND forecast_time <= DATE_ADD(NOW(), INTERVAL 24 HOUR)
+      ORDER BY forecast_time
+    `, [locationId]);
         res.json(rows);
     } catch (e) {
         console.error(e);
@@ -265,161 +185,90 @@ app.get("/api/weather/hourly/:locationId", async (req, res) => {
     }
 });
 
-/**
- * DAILY (7 DAYS)
- */
 app.get("/api/weather/daily/:locationId", async (req, res) => {
     const { locationId } = req.params;
-
     try {
-        const [rows] = await pool.query(
-            `
-            SELECT
-                forecast_date,
-                temp_min,
-                temp_max,
-                weather_code
-            FROM weather_daily
-            WHERE location_id = ?
-            ORDER BY forecast_date
-            LIMIT 7
-            `,
-            [locationId]
-        );
-
-        res.json(
-            rows.map((d) => ({
-                ...d,
-                condition: mapWeatherCode(d.weather_code),
-            }))
-        );
+        const [rows] = await pool.query(`
+      SELECT forecast_date, temp_min, temp_max, weather_code
+      FROM weather_daily
+      WHERE location_id = ?
+      ORDER BY forecast_date
+      LIMIT 7
+    `, [locationId]);
+        res.json(rows.map(d => ({ ...d, condition: mapWeatherCode(d.weather_code) })));
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: "Failed to load daily forecast" });
     }
 });
 
-/* =========================
-   PROFILE
-========================= */
+// =========================
+// PROFILE PHOTO ROUTER (MULTER)
+// =========================
+const profilePhotoRouter = require("./routes/profilePhoto");
+app.use("/api", profilePhotoRouter);
+app.use("/uploads", express.static("uploads"));
+
+// =========================
+// USER PROFILE
+// =========================
 app.get("/api/users/me", verifyJWT, async (req, res) => {
-    const [rows] = await pool.query(
-        `
-    SELECT 
-      u.id,
-      u.email,
-      u.full_name,
-      u.phone,
-      u.profile_photo_url,
-      r.id AS region_id,
-      r.name AS region_name
+    const [rows] = await pool.query(`
+    SELECT u.id, u.email, u.full_name, u.phone, u.profile_photo_url,
+           r.id AS region_id, r.name AS region_name
     FROM users u
     LEFT JOIN regions r ON r.id = u.region_id
     WHERE u.id = ?
-    `,
-        [req.user.id]
-    );
+  `, [req.user.id]);
 
-    if (!rows.length) {
-        return res.status(404).json({ error: "Utilisateur introuvable" });
-    }
+    if (!rows.length) return res.status(404).json({ error: "Utilisateur introuvable" });
 
     const u = rows[0];
-
     res.json({
         id: u.id,
         email: u.email,
         full_name: u.full_name,
         phone: u.phone,
         profile_photo_url: u.profile_photo_url,
-        region: u.region_id
-            ? { id: u.region_id, name: u.region_name }
-            : null,
+        region: u.region_id ? { id: u.region_id, name: u.region_name } : null,
     });
 });
 
 app.post("/api/users/profile", verifyJWT, async (req, res) => {
     const { full_name, phone } = req.body;
-
-    await pool.query(
-        `
-    UPDATE users
-    SET full_name = ?, phone = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-    `,
-        [full_name, phone, req.user.id]
-    );
-
-    const [[user]] = await pool.query(
-        `
-    SELECT id, email, full_name, phone, profile_photo_url
-    FROM users
-    WHERE id = ?
-    `,
-        [req.user.id]
-    );
-
+    await pool.query(`UPDATE users SET full_name = ?, phone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [full_name, phone, req.user.id]);
+    const [[user]] = await pool.query(`SELECT id, email, full_name, phone, profile_photo_url FROM users WHERE id = ?`, [req.user.id]);
     res.json(user);
 });
 
-
-/* =========================
-   JOURNAL
-========================= */
+// =========================
+// JOURNAL ROUTES
+// =========================
 app.get("/api/journal", verifyJWT, async (req, res) => {
-    const [rows] = await pool.query(
-        `
-        SELECT *
-        FROM crop_journal
-        WHERE user_id = ?
-        ORDER BY observation_date DESC
-        `,
-        [req.user.id]
-    );
-
+    const [rows] = await pool.query(`SELECT * FROM crop_journal WHERE user_id = ? ORDER BY observation_date DESC`, [req.user.id]);
     res.json(rows);
 });
 
 app.post("/api/journal", verifyJWT, async (req, res) => {
     const { observation_date, observation_type, crop_type, notes_mg } = req.body;
-
-    await pool.query(
-        `
-        INSERT INTO crop_journal
-        (id, user_id, observation_date, observation_type, crop_type, notes_mg)
-        VALUES (UUID(), ?, ?, ?, ?, ?)
-        `,
-        [req.user.id, observation_date, observation_type, crop_type, notes_mg]
-    );
-
+    await pool.query(`INSERT INTO crop_journal (id, user_id, observation_date, observation_type, crop_type, notes_mg) VALUES (UUID(), ?, ?, ?, ?, ?)`,
+        [req.user.id, observation_date, observation_type, crop_type, notes_mg]);
     res.json({ ok: true });
 });
 
-// UPDATE journal
 app.put("/api/journal/:id", verifyJWT, async (req, res) => {
     const { id } = req.params;
     const { observation_date, observation_type, crop_type, notes_mg } = req.body;
 
-    if (!observation_date || !observation_type) {
-        return res.status(400).json({ error: "Missing fields" });
-    }
+    if (!observation_date || !observation_type) return res.status(400).json({ error: "Missing fields" });
 
     try {
-        const result = await pool.query(
-            `UPDATE crop_journal
-       SET observation_date = ?, observation_type = ?, crop_type = ?, notes_mg = ?
-       WHERE id = ? AND user_id = ?`,
-            [observation_date, observation_type, crop_type ?? null, notes_mg ?? null, id, req.user.id]
-        );
-
+        const result = await pool.query(`UPDATE crop_journal SET observation_date = ?, observation_type = ?, crop_type = ?, notes_mg = ? WHERE id = ? AND user_id = ?`,
+            [observation_date, observation_type, crop_type ?? null, notes_mg ?? null, id, req.user.id]);
         const affected = result?.affectedRows ?? result?.[0]?.affectedRows;
         if (!affected) return res.status(404).json({ error: "Journal not found" });
 
-        const row = await pool.query(
-            "SELECT * FROM crop_journal WHERE id = ? AND user_id = ?",
-            [id, req.user.id]
-        );
-
+        const [row] = await pool.query("SELECT * FROM crop_journal WHERE id = ? AND user_id = ?", [id, req.user.id]);
         res.json(row?.[0] ?? row?.[0]?.[0] ?? null);
     } catch (e) {
         console.error("Update journal error", e);
@@ -427,20 +276,12 @@ app.put("/api/journal/:id", verifyJWT, async (req, res) => {
     }
 });
 
-
-// DELETE journal
 app.delete("/api/journal/:id", verifyJWT, async (req, res) => {
     const { id } = req.params;
-
     try {
-        const result = await pool.query(
-            "DELETE FROM crop_journal WHERE id = ? AND user_id = ?",
-            [id, req.user.id]
-        );
-
+        const result = await pool.query("DELETE FROM crop_journal WHERE id = ? AND user_id = ?", [id, req.user.id]);
         const affected = result?.affectedRows ?? result?.[0]?.affectedRows;
         if (!affected) return res.status(404).json({ error: "Journal not found" });
-
         res.json({ ok: true });
     } catch (e) {
         console.error("Delete journal error", e);
@@ -448,49 +289,29 @@ app.delete("/api/journal/:id", verifyJWT, async (req, res) => {
     }
 });
 
-
-
-
-
+// =========================
+// ADVICE / ALERTS
+// =========================
 app.get("/api/advice/by-weather/:locationId", async (req, res) => {
     const { locationId } = req.params;
     const limit = Math.min(parseInt(req.query.limit || "20", 10) || 20, 50);
 
     try {
-        const [[w]] = await pool.query(
-            `
+        const [[w]] = await pool.query(`
       SELECT w.temperature, w.wind_speed, w.humidity, w.weather_code, w.forecast_time, l.place_name
       FROM weather_hourly w
       JOIN weather_locations l ON l.id = w.location_id
       WHERE w.location_id = ?
       ORDER BY w.forecast_time DESC
       LIMIT 1
-      `,
-            [locationId]
-        );
-
+    `, [locationId]);
         if (!w) return res.json({ meta: null, advices: [] });
 
-        const [advices] = await pool.query(
-            `
-      SELECT id, crop_type, season, title_mg, content_mg, icon, created_at
-      FROM agricultural_advices
-      ORDER BY created_at DESC
-      LIMIT ?
-      `,
-            [limit]
-        );
+        const [advices] = await pool.query(`SELECT id, crop_type, season, title_mg, content_mg, icon, created_at FROM agricultural_advices ORDER BY created_at DESC LIMIT ?`, [limit]);
 
-        return res.json({
-            meta: {
-                locationId,
-                place_name: w.place_name,
-                forecast_time: w.forecast_time,
-                temperature: Number(w.temperature),
-                wind: Number(w.wind_speed),
-                humidity: Number(w.humidity),
-            },
-            advices,
+        res.json({
+            meta: { locationId, place_name: w.place_name, forecast_time: w.forecast_time, temperature: Number(w.temperature), wind: Number(w.wind_speed), humidity: Number(w.humidity) },
+            advices
         });
     } catch (e) {
         console.error(e);
@@ -498,24 +319,20 @@ app.get("/api/advice/by-weather/:locationId", async (req, res) => {
     }
 });
 
-
 app.get("/api/alerts/by-weather/:locationId", async (req, res) => {
     const { locationId } = req.params;
     const limit = Math.min(parseInt((req.query.limit || "3").toString(), 10) || 3, 3);
 
     try {
-        // Latest weather
-        const [[w]] = await pool.query(
-            `
+        const [[w]] = await pool.query(`
       SELECT w.temperature, w.humidity, w.wind_speed, w.weather_code, w.forecast_time, l.place_name
       FROM weather_hourly w
       JOIN weather_locations l ON l.id = w.location_id
       WHERE w.location_id = ?
       ORDER BY w.forecast_time DESC
       LIMIT 1
-      `,
-            [locationId]
-        );
+    `, [locationId]);
+
         if (!w) return res.json({ meta: null, alerts: [] });
 
         function codeToCondition(code) {
@@ -534,9 +351,7 @@ app.get("/api/alerts/by-weather/:locationId", async (req, res) => {
         const humidity = Number(w.humidity ?? 0);
         const alertTime = w.forecast_time;
 
-        // Pick templates (max 3)
-        const [templates] = await pool.query(
-            `
+        const [templates] = await pool.query(`
       SELECT alert_type, severity, title_mg, message_mg, recommendation_mg, priority
       FROM alert_templates
       WHERE is_active = 1
@@ -549,63 +364,43 @@ app.get("/api/alerts/by-weather/:locationId", async (req, res) => {
         AND (max_humidity IS NULL OR max_humidity >= ?)
       ORDER BY priority DESC
       LIMIT ?
-      `,
-            [condition, temperature, temperature, wind, wind, humidity, humidity, limit]
-        );
+    `, [condition, temperature, temperature, wind, wind, humidity, humidity, limit]);
 
-        // Insert (dedupe handled by UNIQUE key)
         for (const t of templates) {
             try {
-                await pool.query(
-                    `
+                await pool.query(`
           INSERT INTO weather_alerts
-            (id, location_id, alert_type, severity, title_mg, message_mg, recommendation_mg, alert_time, is_active, created_at)
-          VALUES
-            (UUID(), ?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
-          `,
-                    [locationId, t.alert_type, t.severity, t.title_mg, t.message_mg, t.recommendation_mg, alertTime]
-                );
-            } catch {
-                // duplicate => ignore
-            }
+          (id, location_id, alert_type, severity, title_mg, message_mg, recommendation_mg, alert_time, is_active, created_at)
+          VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+        `, [locationId, t.alert_type, t.severity, t.title_mg, t.message_mg, t.recommendation_mg, alertTime]);
+            } catch { }
         }
 
-        // Return alerts for this hour (max 3)
-        const [alerts] = await pool.query(
-            `
+        const [alerts] = await pool.query(`
       SELECT id, location_id, alert_type, severity, title_mg, message_mg, recommendation_mg, alert_time, is_active, created_at
       FROM weather_alerts
       WHERE location_id = ? AND alert_time = ?
       ORDER BY created_at DESC
       LIMIT ?
-      `,
-            [locationId, alertTime, limit]
-        );
+    `, [locationId, alertTime, limit]);
 
-        return res.json({
-            meta: {
-                locationId,
-                place_name: w.place_name,
-                forecast_time: alertTime,
-                condition,
-                temperature,
-                wind,
-                humidity,
-            },
-            alerts,
+        res.json({
+            meta: { locationId, place_name: w.place_name, forecast_time: alertTime, condition, temperature, wind, humidity },
+            alerts
         });
+
     } catch (e) {
         console.error(e);
         return res.status(500).json({ error: "Failed to load alerts" });
     }
 });
-const profilePhotoRouter = require("./routes/profilePhoto");
 
-app.use("/api", profilePhotoRouter);
-app.use("/uploads", express.static("uploads"));
-
-
+// =========================
+// PING
+// =========================
 app.get("/api/ping", (req, res) => res.json({ ok: true, time: Date.now() }));
-app.listen(PORT, () => {
-    console.log(` Backend running on port ${PORT}`);
-});
+
+// =========================
+// START SERVER
+// =========================
+app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
