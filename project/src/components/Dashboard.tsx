@@ -16,6 +16,7 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import { API_URL } from "../config";
 import { readAdviceCache, readAlertsCache } from "../offline/cache";
+import UploadForm from "../components/UploadForm";
 
 
 type CurrentWeather = {
@@ -533,6 +534,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           </button>
         </section>
       </main>
+      {showUpload && (
+        <UploadForm onClose={() => setShowUpload(false)} />
+      )}
     </div>
   );
 }
