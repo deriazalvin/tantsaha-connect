@@ -15,7 +15,7 @@ router.post(
                 return res.status(400).json({ error: "Aucune image envoyée" });
             }
 
-            const photoUrl = `/uploads/${req.file.filename}`;
+            const photoUrl = `/uploads/profile/${req.file.filename}`;
 
             await pool.query(
                 "UPDATE users SET profile_photo_url = ? WHERE id = ?",

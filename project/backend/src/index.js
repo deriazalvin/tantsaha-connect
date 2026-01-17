@@ -3,6 +3,7 @@ console.log("BOOT MARKER => 2026-01-04T16:50Z");
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const path = require("path");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const pool = require("./db");
@@ -47,8 +48,21 @@ app.use(
     })
 );
 app.options("*", cors());
+
+
 app.use(express.json());
-app.use("/uploads", express.static("uploads")); // fichiers statiques
+
+app.use(
+    "/uploads",
+    express.static(path.join(__dirname, "..", "uploads"))
+);
+
+// =========================
+// PROFILE PHOTO ROUTER
+// =========================
+const profilePhotoRouter = require("./routes/profilePhoto");
+app.use("/api", profilePhotoRouter);
+
 
 // =========================
 // JWT Middleware
@@ -220,11 +234,7 @@ app.get("/api/weather/daily/:locationId", async (req, res) => {
     }
 });
 
-// =========================
-// PROFILE PHOTO ROUTER
-// =========================
-const profilePhotoRouter = require("./routes/profilePhoto");
-app.use("/api", profilePhotoRouter);
+
 
 // =========================
 // USER PROFILE

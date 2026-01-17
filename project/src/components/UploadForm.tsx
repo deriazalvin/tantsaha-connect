@@ -39,7 +39,16 @@ export default function UploadForm({ onClose }: Props) {
                 body: formData,
             });
 
-            const data = await res.json();
+            let data;
+            const contentType = res.headers.get("content-type");
+
+            if (contentType && contentType.includes("application/json")) {
+                data = await res.json();
+            } else {
+                const text = await res.text();
+                throw new Error("Réponse non JSON du serveur:\n" + text);
+            }
+
 
             if (!res.ok) {
                 throw new Error(data.error || "Erreur upload");
