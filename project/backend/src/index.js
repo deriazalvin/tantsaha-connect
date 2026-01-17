@@ -12,51 +12,47 @@ const PORT = process.env.PORT || 4000;
 const JWT_SECRET = process.env.JWT_SECRET || "change_me";
 
 // =========================
-// CORS CORRECT
+// ALLOWED ORIGINS
 // =========================
 const allowedOrigins = [
     "https://tantsaha-connect.vercel.app",
     "https://tantsaha-connect-beta.vercel.app",
 ];
 
-app.use(
-    cors({
-        origin: function (origin, callback) {
-            if (!origin) return callback(null, true); // Postman, backend requests
-            if (allowedOrigins.includes(origin)) return callback(null, true);
-            return callback(new Error("CORS not allowed"));
-        },
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization"],
-        credentials: true,
-    })
-);
-
-// Pour OPTIONS preflight
-app.options("*", cors());
-    
 // =========================
 // BODY PARSERS
 // =========================
-app.use(express.json()); // application/json
-app.use(express.urlencoded({ extended: true })); // application/x-www-form-urlencoded
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
+// =========================
+// CORS - DOIT ÊTRE AVANT TOUTES LES ROUTES
+// =========================
+app.use(cors({
+    origin: function (origin, callback) {
+        if (!origin) return callback(null, true); // Postman ou backend
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(new Error("CORS not allowed"));
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+}));
+
+// OPTIONS preflight
+app.options("*", cors());
+
+// =========================
+// UPLOADS STATICS
+// =========================
 app.use(
     "/uploads",
     express.static(path.join(__dirname, "uploads"))
 );
 console.log("Uploads folder path:", path.join(__dirname, "uploads"));
 
-
 // =========================
-// PROFILE PHOTO ROUTER
-// =========================
-const profilePhotoRouter = require("./routes/profilePhoto");
-app.use("/api", profilePhotoRouter);
-
-
-// =========================
-// JWT Middleware
+// JWT MIDDLEWARE
 // =========================
 function verifyJWT(req, res, next) {
     const auth = req.headers.authorization;
@@ -66,11 +62,20 @@ function verifyJWT(req, res, next) {
 
     try {
         req.user = jwt.verify(auth.slice(7), JWT_SECRET);
+        console.log("JWT decoded:", req.user); // <-- log utile pour debug
         next();
-    } catch {
+    } catch (err) {
+        console.error("JWT error:", err);
         return res.status(401).json({ error: "Invalid token" });
     }
 }
+
+// =========================
+// PROFILE PHOTO ROUTER
+// =========================
+const profilePhotoRouter = require("./routes/profilePhoto");
+app.use("/api", profilePhotoRouter);
+
 
 // =========================
 // UTILS
