@@ -1,0 +1,57 @@
+# Vercel Speed Insights Integration Report
+
+## Overview
+Successfully integrated Vercel Speed Insights into the tantsaha-connect project, a Vite + React + TypeScript application.
+
+## What Was Implemented
+
+### Changes Made:
+
+1. **Installed @vercel/speed-insights package** (v1.3.1)
+   - Added to dependencies in package.json
+   - Updated package-lock.json with all transitive dependencies
+
+2. **Updated src/main.tsx**
+   - Added import: `import { injectSpeedInsights } from '@vercel/speed-insights';`
+   - Added initialization call: `injectSpeedInsights();` right after `registerSW({ immediate: true });`
+   - This ensures Speed Insights tracking is initialized as early as possible in the application lifecycle
+
+## Implementation Details
+
+### Why This Approach?
+This project uses:
+- **Build Tool**: Vite (modern JavaScript bundler)
+- **Framework**: React 18.3.1 with TypeScript
+- **Entry Point**: src/main.tsx
+
+According to the Vercel Speed Insights guide, for frameworks not explicitly listed in the dashboard (like Vite), the "other" framework approach using `injectSpeedInsights()` is recommended. This function:
+- Adds the tracking script to your app automatically
+- Must be called once in the app (done in main.tsx, the entry point)
+- Runs on the client side
+- Integrates seamlessly with the application lifecycle
+
+### What This Enables
+Once deployed to Vercel and Speed Insights is enabled in the dashboard:
+1. The tracking script will be added to the `/_vercel/speed-insights/*` routes
+2. Performance metrics will be collected and sent to Vercel
+3. Data will be viewable in the Vercel dashboard's Speed Insights tab
+4. Users can monitor Core Web Vitals and other performance metrics
+
+## Files Modified
+- `package.json` - Added @vercel/speed-insights dependency
+- `package-lock.json` - Updated with new dependency tree
+- `src/main.tsx` - Added Speed Insights initialization
+
+## Verification
+- ✅ Build completes successfully with no errors
+- ✅ src/main.tsx passes ESLint with no new errors
+- ✅ Application structure preserved
+- ✅ No breaking changes to existing functionality
+
+## Next Steps
+1. Push these changes to the repository
+2. Enable Speed Insights in the Vercel dashboard for this project
+3. Deploy the application to Vercel
+4. Access the Speed Insights tab in the Vercel dashboard to view performance data
+
+Note: Speed Insights data collection begins after deployment and will show data once users visit the site.
