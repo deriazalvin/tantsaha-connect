@@ -30,6 +30,7 @@ export default function UploadForm({ onClose }: Props) {
         setLoading(true);
 
         try {
+            console.log("TOKEN:", token);
             const res = await fetch(`${API_BASE}/api/profile/photo`, {
                 method: "POST",
                 headers: {
