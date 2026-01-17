@@ -1,5 +1,3 @@
-console.log("BOOT MARKER => 2026-01-04T16:50Z");
-
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
@@ -7,23 +5,14 @@ const path = require("path");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const pool = require("./db");
-const { fetchWeatherForLocation } = require("./fetchWeather");
 
 dotenv.config();
-
-console.log("ENV DB =>", {
-    DB_HOST: process.env.DB_HOST,
-    DB_PORT: process.env.DB_PORT,
-    DB_USER: process.env.DB_USER,
-    DB_NAME: process.env.DB_NAME,
-});
-
 const app = express();
 const PORT = process.env.PORT || 4000;
 const JWT_SECRET = process.env.JWT_SECRET || "change_me";
 
 // =========================
-// CORS
+// CORS CORRECT
 // =========================
 const allowedOrigins = [
     "https://tantsaha-connect.vercel.app",
@@ -32,13 +21,9 @@ const allowedOrigins = [
 
 app.use(
     cors({
-        origin: (origin, callback) => {
-            if (!origin) return callback(null, true);
-
-            if (allowedOrigins.includes(origin)) {
-                return callback(null, true);
-            }
-
+        origin: function (origin, callback) {
+            if (!origin) return callback(null, true); // Postman, backend requests
+            if (allowedOrigins.includes(origin)) return callback(null, true);
             return callback(new Error("CORS not allowed"));
         },
         methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -47,11 +32,14 @@ app.use(
     })
 );
 
+// Pour OPTIONS preflight
 app.options("*", cors());
     
-
-
-app.use(express.json());
+// =========================
+// BODY PARSERS
+// =========================
+app.use(express.json()); // application/json
+app.use(express.urlencoded({ extended: true })); // application/x-www-form-urlencoded
 
 app.use(
     "/uploads",
@@ -266,18 +254,25 @@ app.get("/api/users/me", verifyJWT, async (req, res) => {
 });
 
 app.post("/api/users/profile", verifyJWT, async (req, res) => {
+    console.log("POST /api/users/profile body:", req.body);
     const { full_name, phone } = req.body;
-    await pool.query("UPDATE users SET full_name = ?, phone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [
-        full_name,
-        phone,
-        req.user.id,
-    ]);
-    const [[user]] = await pool.query(
-        "SELECT id, email, full_name, phone, profile_photo_url FROM users WHERE id = ?",
-        [req.user.id]
-    );
-    res.json(user);
+
+    try {
+        await pool.query(
+            "UPDATE users SET full_name = ?, phone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            [full_name, phone, req.user.id]
+        );
+        const [[user]] = await pool.query(
+            "SELECT id, email, full_name, phone, profile_photo_url FROM users WHERE id = ?",
+            [req.user.id]
+        );
+        res.json(user);
+    } catch (err) {
+        console.error("Update profile error:", err);
+        res.status(500).json({ error: "Update failed" });
+    }
 });
+
 
 // =========================
 // JOURNAL
