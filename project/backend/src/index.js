@@ -33,29 +33,32 @@ const allowedOrigins = [
 app.use(
     cors({
         origin: (origin, callback) => {
-            if (!origin) return callback(null, true); // Postman / fetch direct
-            if (
-                allowedOrigins.includes(origin) ||
-                /^https:\/\/tantsaha-connect-.*\.vercel\.app$/.test(origin)
-            ) {
+            if (!origin) return callback(null, true);
+
+            if (allowedOrigins.includes(origin)) {
                 return callback(null, true);
             }
-            return callback(new Error("CORS non autorisé"));
+
+            return callback(new Error("CORS not allowed"));
         },
         methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization"],
         credentials: true,
     })
 );
+
 app.options("*", cors());
+    
 
 
 app.use(express.json());
 
 app.use(
     "/uploads",
-    express.static(path.join(__dirname, "..", "uploads"))
+    express.static(path.join(__dirname, "uploads"))
 );
+console.log("Uploads folder path:", path.join(__dirname, "uploads"));
+
 
 // =========================
 // PROFILE PHOTO ROUTER
