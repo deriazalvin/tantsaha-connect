@@ -8,7 +8,7 @@ const pool = require("../db");
 router.post(
     "/profile/photo",
     verifyJWT,
-    upload.single("photo",file),
+    upload.single("photo"),
     async (req, res) => {
         try {
             if (!req.file) {

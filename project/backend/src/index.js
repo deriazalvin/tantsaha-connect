@@ -599,9 +599,6 @@ app.get("/api/alerts/by-weather/:locationId", async (req, res) => {
         return res.status(500).json({ error: "Failed to load alerts" });
     }
 });
-const uploadRouter = require("./middlewars/upload")
-app.use('/api', uploadRouter);
-app.use("/uploads", express.static("uploads"));
 const profilePhotoRouter = require("./routes/profilePhoto");
 
 app.use("/api", profilePhotoRouter);
