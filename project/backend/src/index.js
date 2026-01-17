@@ -40,6 +40,7 @@ app.use(cors({
 app.options("*", cors());
 
 app.use(express.json());
+app.use("/uploads", express.static("uploads")); // static files
 
 // =========================
 // JWT VERIFY MIDDLEWARE
@@ -69,6 +70,13 @@ function mapWeatherCode(code) {
     return "Unknown";
 }
 
+
+// =========================
+// PROFILE PHOTO ROUTER
+// =========================
+const profilePhotoRouter = require("./routes/profilePhoto");
+app.use("/api", profilePhotoRouter);
+
 // =========================
 // AUTH ROUTES
 // =========================
@@ -81,15 +89,12 @@ app.post("/auth/signup", async (req, res) => {
         if (exists.length) return res.status(400).json({ error: "User exists" });
 
         const hash = await bcrypt.hash(password, 10);
-
         await pool.query("INSERT INTO users (id, email, password_hash) VALUES (UUID(), ?, ?)", [email, hash]);
 
         const [[user]] = await pool.query("SELECT id FROM users WHERE email = ?", [email]);
-
         await pool.query("UPDATE users SET full_name = ? WHERE id = ?", [full_name || null, user.id]);
 
         const token = jwt.sign({ id: user.id, email }, JWT_SECRET, { expiresIn: "7d" });
-
         res.json({ token, user });
     } catch (e) {
         console.error(e);
@@ -102,14 +107,12 @@ app.post("/auth/login", async (req, res) => {
 
     try {
         const [[user]] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
-
         if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
         const ok = await bcrypt.compare(password, user.password_hash);
         if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
         const token = jwt.sign({ id: user.id, email }, JWT_SECRET, { expiresIn: "7d" });
-
         res.json({ token, user: { id: user.id, email } });
     } catch (e) {
         console.error(e);
@@ -123,17 +126,15 @@ app.post("/auth/login", async (req, res) => {
 app.post("/api/weather/refresh", async (req, res) => {
     const { latitude, longitude, place_name, placename, region, country } = req.body || {};
     const finalPlaceName = place_name || placename;
-
     if (typeof latitude !== "number" || typeof longitude !== "number" || !finalPlaceName) {
         return res.status(400).json({ error: "Missing location data" });
     }
-
     try {
         const result = await fetchWeatherForLocation({ latitude, longitude, place_name: finalPlaceName, region, country });
-        return res.json(result);
+        res.json(result);
     } catch (e) {
         console.error(e);
-        return res.status(500).json({ error: "Weather fetch failed" });
+        res.status(500).json({ error: "Weather fetch failed" });
     }
 });
 
@@ -160,13 +161,7 @@ app.get("/api/weather/current/:locationId", async (req, res) => {
         return "Cloudy";
     }
 
-    res.json({
-        temperature: row.temperature,
-        condition: codeToCondition(row.weather_code),
-        icon: row.weather_code,
-        place_name: row.place_name,
-        time: row.time,
-    });
+    res.json({ temperature: row.temperature, condition: codeToCondition(row.weather_code), icon: row.weather_code, place_name: row.place_name, time: row.time });
 });
 
 app.get("/api/weather/hourly/:locationId", async (req, res) => {
@@ -203,41 +198,25 @@ app.get("/api/weather/daily/:locationId", async (req, res) => {
 });
 
 // =========================
-// PROFILE PHOTO ROUTER (MULTER)
-// =========================
-const profilePhotoRouter = require("./routes/profilePhoto");
-app.use("/api", profilePhotoRouter);
-app.use("/uploads", express.static("uploads"));
-
-// =========================
-// USER PROFILE
+// USER PROFILE ROUTES
 // =========================
 app.get("/api/users/me", verifyJWT, async (req, res) => {
     const [rows] = await pool.query(`
-    SELECT u.id, u.email, u.full_name, u.phone, u.profile_photo_url,
-           r.id AS region_id, r.name AS region_name
-    FROM users u
-    LEFT JOIN regions r ON r.id = u.region_id
-    WHERE u.id = ?
-  `, [req.user.id]);
-
+        SELECT u.id, u.email, u.full_name, u.phone, u.profile_photo_url,
+               r.id AS region_id, r.name AS region_name
+        FROM users u
+        LEFT JOIN regions r ON r.id = u.region_id
+        WHERE u.id = ?
+    `, [req.user.id]);
     if (!rows.length) return res.status(404).json({ error: "Utilisateur introuvable" });
-
     const u = rows[0];
-    res.json({
-        id: u.id,
-        email: u.email,
-        full_name: u.full_name,
-        phone: u.phone,
-        profile_photo_url: u.profile_photo_url,
-        region: u.region_id ? { id: u.region_id, name: u.region_name } : null,
-    });
+    res.json({ id: u.id, email: u.email, full_name: u.full_name, phone: u.phone, profile_photo_url: u.profile_photo_url, region: u.region_id ? { id: u.region_id, name: u.region_name } : null });
 });
 
 app.post("/api/users/profile", verifyJWT, async (req, res) => {
     const { full_name, phone } = req.body;
-    await pool.query(`UPDATE users SET full_name = ?, phone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [full_name, phone, req.user.id]);
-    const [[user]] = await pool.query(`SELECT id, email, full_name, phone, profile_photo_url FROM users WHERE id = ?`, [req.user.id]);
+    await pool.query("UPDATE users SET full_name = ?, phone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [full_name, phone, req.user.id]);
+    const [[user]] = await pool.query("SELECT id, email, full_name, phone, profile_photo_url FROM users WHERE id = ?", [req.user.id]);
     res.json(user);
 });
 
@@ -259,7 +238,6 @@ app.post("/api/journal", verifyJWT, async (req, res) => {
 app.put("/api/journal/:id", verifyJWT, async (req, res) => {
     const { id } = req.params;
     const { observation_date, observation_type, crop_type, notes_mg } = req.body;
-
     if (!observation_date || !observation_type) return res.status(400).json({ error: "Missing fields" });
 
     try {
@@ -295,7 +273,6 @@ app.delete("/api/journal/:id", verifyJWT, async (req, res) => {
 app.get("/api/advice/by-weather/:locationId", async (req, res) => {
     const { locationId } = req.params;
     const limit = Math.min(parseInt(req.query.limit || "20", 10) || 20, 50);
-
     try {
         const [[w]] = await pool.query(`
       SELECT w.temperature, w.wind_speed, w.humidity, w.weather_code, w.forecast_time, l.place_name
@@ -322,7 +299,6 @@ app.get("/api/advice/by-weather/:locationId", async (req, res) => {
 app.get("/api/alerts/by-weather/:locationId", async (req, res) => {
     const { locationId } = req.params;
     const limit = Math.min(parseInt((req.query.limit || "3").toString(), 10) || 3, 3);
-
     try {
         const [[w]] = await pool.query(`
       SELECT w.temperature, w.humidity, w.wind_speed, w.weather_code, w.forecast_time, l.place_name
@@ -384,11 +360,7 @@ app.get("/api/alerts/by-weather/:locationId", async (req, res) => {
       LIMIT ?
     `, [locationId, alertTime, limit]);
 
-        res.json({
-            meta: { locationId, place_name: w.place_name, forecast_time: alertTime, condition, temperature, wind, humidity },
-            alerts
-        });
-
+        res.json({ meta: { locationId, place_name: w.place_name, forecast_time: alertTime, condition, temperature, wind, humidity }, alerts });
     } catch (e) {
         console.error(e);
         return res.status(500).json({ error: "Failed to load alerts" });
