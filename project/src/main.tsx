@@ -4,8 +4,10 @@ import App from './App.tsx';
 import { AuthProvider } from './contexts/AuthContext';
 import './index.css';
 import { registerSW } from "virtual:pwa-register";
+import { injectSpeedInsights } from '@vercel/speed-insights';
 
 registerSW({ immediate: true });
+injectSpeedInsights();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
