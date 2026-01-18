@@ -17,6 +17,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "change_me";
 const allowedOrigins = [
     "https://tantsaha-connect.vercel.app",
     "https://tantsaha-connect-beta.vercel.app",
+    "http://localhost:5173", // tests locaux
 ];
 
 // =========================
@@ -29,17 +30,18 @@ app.use(express.urlencoded({ extended: true }));
 // CORS
 // =========================
 app.use(cors({
-    origin: function (origin, callback) {
-        if (!origin) return callback(null, true);
+    origin: function(origin, callback) {
+        if (!origin) return callback(null, true); // server-to-server / Postman
         if (allowedOrigins.includes(origin)) return callback(null, true);
+        console.warn("CORS rejected origin:", origin);
         return callback(new Error("CORS non autorisé"));
     },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
+    methods: ["GET","POST","PUT","DELETE","OPTIONS"],
+    allowedHeaders: ["Content-Type","Authorization"]
 }));
 
-app.options("*", cors());
+app.options("*", cors()); 
 
 // =========================
 // UPLOADS STATICS
@@ -61,7 +63,6 @@ function verifyJWT(req, res, next) {
 
     try {
         req.user = jwt.verify(auth.slice(7), JWT_SECRET);
-        console.log("JWT decoded:", req.user);
         next();
     } catch (err) {
         console.error("JWT error:", err);
@@ -146,16 +147,22 @@ app.post("/api/weather/refresh", async (req, res) => {
     }
 
     try {
+        // Timeout 5s pour éviter blocage
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), 5000);
+
         const result = await fetchWeatherForLocation({
             latitude,
             longitude,
             place_name: finalPlaceName,
             region,
             country,
+            signal: controller.signal
         });
+
         res.json(result);
-    } catch (e) {
-        console.error(e);
+    } catch (err) {
+        console.error("/weather/refresh error:", err);
         res.status(500).json({ error: "Weather fetch failed" });
     }
 });
@@ -235,26 +242,31 @@ app.get("/api/weather/daily/:locationId", async (req, res) => {
 // PHOTO DE PROFILE
 // =========================
 app.get("/api/users/me", verifyJWT, async (req, res) => {
-    const [rows] = await pool.query(
-        `SELECT u.id, u.email, u.full_name, u.phone, u.profile_photo_url,
-            r.id AS region_id, r.name AS region_name
-     FROM users u
-     LEFT JOIN regions r ON r.id = u.region_id
-     WHERE u.id = ?`,
-        [req.user.id]
-    );
+    try {
+        const [rows] = await pool.query(
+            `SELECT u.id, u.email, u.full_name, u.phone, u.profile_photo_url,
+                r.id AS region_id, r.name AS region_name
+            FROM users u
+            LEFT JOIN regions r ON r.id = u.region_id
+            WHERE u.id = ?`,
+            [req.user.id]
+        );
 
-    if (!rows.length) return res.status(404).json({ error: "Utilisateur introuvable" });
+        if (!rows.length) return res.status(404).json({ error: "Utilisateur introuvable" });
 
-    const u = rows[0];
-    res.json({
-        id: u.id,
-        email: u.email,
-        full_name: u.full_name,
-        phone: u.phone,
-        profile_photo_url: u.profile_photo_url,
-        region: u.region_id ? { id: u.region_id, name: u.region_name } : null,
-    });
+        const u = rows[0];
+        res.json({
+            id: u.id,
+            email: u.email,
+            full_name: u.full_name,
+            phone: u.phone,
+            profile_photo_url: u.profile_photo_url,
+            region: u.region_id ? { id: u.region_id, name: u.region_name } : null,
+        });
+    } catch (err) {
+        console.error("/users/me error:", err);
+        res.status(500).json({ error: "Server error" });
+    }
 });
 
 app.post("/api/users/profile", verifyJWT, async (req, res) => {
@@ -463,6 +475,13 @@ app.get("/api/alerts/by-weather/:locationId", async (req, res) => {
         console.error(e);
         res.status(500).json({ error: "Failed to load alerts" });
     }
+});
+// =========================
+// GLOBAL ERROR HANDLER
+// =========================
+app.use((err, req, res, next) => {
+    console.error("Global error:", err.message || err);
+    res.status(500).json({ error: "Server error" });
 });
 
 
