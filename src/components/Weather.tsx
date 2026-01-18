@@ -349,172 +349,181 @@ export default function Weather({ onNavigate }: WeatherProps) {
     );
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <header className="p-4 flex flex-col gap-4">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => onNavigate("dashboard")}
-              className="p-2 hover:bg-green-600 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-6 h-6" />
-            </button>
+    <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-gray-800 text-white">
+  {/* Header */}
+  <header className="p-4 flex flex-col gap-4">
+    <div className="flex justify-between items-center">
+      {/* Left: back button + location */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => onNavigate("dashboard")}
+          className="p-2 bg-gray-700/60 hover:bg-green-600 rounded-full transition-colors"
+        >
+          <ArrowLeft className="w-6 h-6" />
+        </button>
 
-            <MapPin />
+        <MapPin className="w-5 h-5 text-green-400" />
 
-            <div>
-              <div className="font-bold">{current.place_name}</div>
-              <div className="text-sm opacity-70">
-                {clock.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <button onClick={() => refreshWeather()}>
-              <RefreshCw />
-            </button>
-            <button onClick={addFavorite}>
-              <Star />
-            </button>
+        <div className="flex flex-col">
+          <div className="font-bold text-lg">{current.place_name}</div>
+          <div className="text-sm opacity-70">
+            {clock.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
           </div>
         </div>
+      </div>
 
-        <div className="flex gap-2 overflow-x-auto mt-2">
-          {favorites.map((f) => (
-            <div
-              key={f.locationId}
-              className="bg-white/10 rounded-xl p-2 flex items-center gap-1 cursor-pointer"
-              onClick={() => setActiveLocation(f.locationId, { lat: f.lat, lon: f.lon })}
-            >
-              <span>{f.place_name}</span>
-              <X
-                className="w-4 h-4"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeFavorite(f.locationId);
-                }}
-              />
-            </div>
-          ))}
-        </div>
+      {/* Right: refresh + favorite */}
+      <div className="flex gap-2">
+        <button className="p-2 bg-gray-700/50 hover:bg-gray-600 rounded-lg transition">
+          <RefreshCw />
+        </button>
+        <button className="p-2 bg-gray-700/50 hover:bg-yellow-500 rounded-lg transition">
+          <Star />
+        </button>
+      </div>
+    </div>
 
-        <div className="mt-2 flex gap-2">
-          <input
-            type="text"
-            placeholder="Rechercher une ville..."
-            value={searchCity}
-            onChange={(e) => setSearchCity(e.target.value)}
-            className="flex-1 p-2 rounded bg-white/10 placeholder-white text-white"
-          />
-          <button
-            className="p-2 bg-blue-600 rounded"
-            onClick={() => {
-              if (!searchCity.trim()) return;
-              refreshWeather(undefined, undefined, searchCity).catch(console.error);
+    {/* Favorites */}
+    <div className="flex gap-2 overflow-x-auto mt-2">
+      {favorites.map((f) => (
+        <div
+          key={f.locationId}
+          className="bg-white/10 hover:bg-white/20 transition-colors rounded-xl p-2 flex items-center gap-2 cursor-pointer"
+          onClick={() => setActiveLocation(f.locationId, { lat: f.lat, lon: f.lon })}
+        >
+          <span className="whitespace-nowrap">{f.place_name}</span>
+          <X
+            className="w-4 h-4 hover:text-red-500"
+            onClick={(e) => {
+              e.stopPropagation();
+              removeFavorite(f.locationId);
             }}
-          >
-            Rechercher
-          </button>
-
-        </div>
-      </header>
-
-      <section className="h-[70vh] flex flex-col justify-end px-6 pb-10 relative">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={current.condition + Math.floor(clock.getHours() / 6)}
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url(${bgImage})` }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 1.2 }}
           />
-        </AnimatePresence>
+        </div>
+      ))}
+    </div>
 
-        <div className="absolute inset-0 bg-black/40" />
-        <div className="relative z-10 text-center">
+    {/* Search bar */}
+    <div className="mt-2 flex gap-2">
+      <input
+        type="text"
+        placeholder="Rechercher une ville..."
+        value={searchCity}
+        onChange={(e) => setSearchCity(e.target.value)}
+        className="flex-1 p-3 rounded-xl bg-white/10 placeholder-white text-white focus:outline-none focus:ring-2 focus:ring-green-500 transition"
+      />
+      <button
+        className="p-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-semibold transition"
+        onClick={() => {
+          if (!searchCity.trim()) return;
+          refreshWeather(undefined, undefined, searchCity).catch(console.error);
+        }}
+      >
+        Rechercher
+      </button>
+    </div>
+  </header>
+
+  {/* Current weather */}
+  <section className="h-[70vh] flex flex-col justify-end px-6 pb-10 relative">
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={current.condition + Math.floor(clock.getHours() / 6)}
+        className="absolute inset-0 bg-cover bg-center rounded-2xl"
+        style={{ backgroundImage: `url(${bgImage})` }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 1.2 }}
+      />
+    </AnimatePresence>
+
+    <div className="absolute inset-0 bg-black/40 rounded-2xl" />
+    <div className="relative z-10 text-center">
+      <motion.div
+        key={current.temperature}
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.8 }}
+        className="text-6xl sm:text-7xl font-bold drop-shadow-lg"
+      >
+        {current.temperature}°
+      </motion.div>
+
+      <motion.div
+        key={current.condition}
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.8, delay: 0.2 }}
+        className="text-lg sm:text-xl opacity-80"
+      >
+        {conditionMG[current.condition] || current.condition}
+      </motion.div>
+    </div>
+  </section>
+
+  {/* Map */}
+  {coords && (
+    <section className="px-6 py-6">
+      <h2 className="font-bold text-lg mb-3">Carte météo</h2>
+      <WeatherMap
+        coords={coords}
+        favorites={favorites.map((fav) => ({
+          lat: fav.lat,
+          lon: fav.lon,
+          name: fav.place_name,
+        }))}
+      />
+    </section>
+  )}
+
+  {/* Hourly forecast */}
+  <section className="px-6 py-4 overflow-x-auto">
+    <h2 className="font-bold text-lg mb-3">Isan’ora</h2>
+    <div className="flex gap-4 min-w-max">
+      {hourly.map((h, i) => {
+        const date = new Date(h.forecast_time);
+        return (
           <motion.div
-            key={current.temperature}
+            key={i}
+            className="bg-white/10 hover:bg-white/20 transition-colors rounded-2xl p-4 min-w-[120px] flex flex-col items-center"
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.8 }}
-            className="text-6xl font-bold"
+            transition={{ duration: 0.6, delay: i * 0.05 }}
           >
-            {current.temperature}°
+            <div className="text-sm opacity-70">{date.getHours()}:00</div>
+            <div className="text-xl font-bold">{h.temp}°</div>
+            <div className="mt-2 text-xs flex items-center gap-1">
+              <Wind className="w-3 h-3" /> {h.wind} km/h
+            </div>
+            <div className="text-xs flex items-center gap-1">
+              <Droplet className="w-3 h-3" /> {h.humidity}%
+            </div>
           </motion.div>
+        );
+      })}
+    </div>
+  </section>
 
-          <motion.div
-            key={current.condition}
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-lg opacity-80"
-          >
-            {conditionMG[current.condition] || current.condition}
-          </motion.div>
-        </div>
-      </section>
-
-      {coords && (
-        <section className="px-6 py-6">
-          <h2 className="font-bold mb-3">Carte météo</h2>
-          <WeatherMap
-            coords={coords}
-            favorites={favorites.map((fav) => ({
-              lat: fav.lat,
-              lon: fav.lon,
-              name: fav.place_name,
-            }))}
-          />
-        </section>
-      )}
-
-      <section className="px-6 py-4 overflow-x-auto">
-        <h2 className="font-bold mb-3">Isan’ora</h2>
-        <div className="flex gap-4 min-w-max">
-          {hourly.map((h, i) => {
-            const date = new Date(h.forecast_time);
-            return (
-              <motion.div
-                key={i}
-                className="bg-white/10 rounded-xl p-3 min-w-[120px]"
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ duration: 0.6, delay: i * 0.05 }}
-              >
-                <div className="text-sm opacity-70">{date.getHours()}:00</div>
-                <div className="text-xl font-bold">{h.temp}°</div>
-                <div className="mt-2 text-xs flex items-center gap-1">
-                  <Wind className="w-3 h-3" /> {h.wind} km/h
-                </div>
-                <div className="text-xs flex items-center gap-1">
-                  <Droplet className="w-3 h-3" /> {h.humidity}%
-                </div>
-              </motion.div>
-            );
+  {/* Daily forecast */}
+  <section className="bg-white text-gray-900 rounded-t-3xl px-6 pt-6 mt-8">
+    <h2 className="font-bold text-lg mb-4">Andro manaraka</h2>
+    {daily.map((d, i) => (
+      <div key={i} className="flex justify-between py-4 border-b last:border-b-0">
+        <div className="text-sm sm:text-base">
+          {new Date(d.forecast_date).toLocaleDateString("mg-MG", {
+            weekday: "short",
+            day: "numeric",
+            month: "short",
           })}
         </div>
-      </section>
+        <div className="font-semibold text-sm sm:text-base">
+          {d.temp_min}° / {d.temp_max}°
+        </div>
+      </div>
+    ))}
+  </section>
+</div>
 
-      <section className="bg-white text-gray-900 rounded-t-3xl px-6 pt-6 mt-8">
-        <h2 className="font-bold mb-4">Andro manaraka</h2>
-        {daily.map((d, i) => (
-          <div key={i} className="flex justify-between py-3 border-b">
-            <div>
-              {new Date(d.forecast_date).toLocaleDateString("mg-MG", {
-                weekday: "short",
-                day: "numeric",
-                month: "short",
-              })}
-            </div>
-            <div className="font-semibold">
-              {d.temp_min}° / {d.temp_max}°
-            </div>
-          </div>
-        ))}
-      </section>
-    </div>
   );
 }
