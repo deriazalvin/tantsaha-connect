@@ -12,13 +12,13 @@ const PORT = process.env.PORT || 4000;
 const JWT_SECRET = process.env.JWT_SECRET || "change_me";
 
 // =========================
-// ALLOWED ORIGINS
+// ALLOWED ORIGINS (normalized, NO trailing slash)
 // =========================
-const allowedOrigins = [
+const allowedOrigins = new Set([
     "https://tantsaha-connect.vercel.app",
-    "https://tantsaha-connect-beta.vercel.app/",
-    "http://localhost:5173", // tests locaux
-];
+    "https://tantsaha-connect-beta.vercel.app",
+    "http://localhost:5173",
+]);
 
 // =========================
 // BODY PARSERS
@@ -29,19 +29,25 @@ app.use(express.urlencoded({ extended: true }));
 // =========================
 // CORS
 // =========================
-app.use(cors({
+const corsOptions = {
     origin: function(origin, callback) {
-        if (!origin) return callback(null, true); // server-to-server / Postman
-        if (allowedOrigins.includes(origin)) return callback(null, true);
+        // allow server-to-server / Postman (no origin)
+        if (!origin) return callback(null, true);
+
+        // normalize origin (remove trailing slash if any)
+        const normalized = origin.replace(/\/$/, "");
+        if (allowedOrigins.has(normalized)) return callback(null, true);
+
         console.warn("CORS rejected origin:", origin);
         return callback(new Error("CORS non autorisé"));
     },
     credentials: true,
     methods: ["GET","POST","PUT","DELETE","OPTIONS"],
     allowedHeaders: ["Content-Type","Authorization"]
-}));
+};
 
-app.options("*", cors()); 
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 // =========================
 // UPLOADS STATICS
@@ -229,7 +235,7 @@ app.get("/api/weather/daily/:locationId", async (req, res) => {
        LIMIT 7`,
             [locationId]
         );
-        res.json(rows.map((d) => ({ ...d, condition: mapWeatherCode(d.weather_code) })));
+        res.json(rows.map((d) => ({ ...d, condition: mapWeatherCode(d.weather_code) })));  
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: "Failed to load daily forecast" });
@@ -289,7 +295,6 @@ app.post("/api/users/profile", verifyJWT, async (req, res) => {
     }
 });
 
-
 // =========================
 // NAOTY
 // =========================
@@ -344,8 +349,8 @@ app.delete("/api/journal/:id", verifyJWT, async (req, res) => {
     }
 });
 
-// ==============================
-// TOROHEVITRA SY FAMPITANDREMANA
+// ============================== 
+// TOROHEVITRA SY FAMPITANDREMANA 
 // ==============================
 app.get("/api/advice/by-weather/:locationId", async (req, res) => {
     const { locationId } = req.params;
@@ -481,8 +486,15 @@ app.get("/api/alerts/by-weather/:locationId", async (req, res) => {
 // =========================
 app.use((err, req, res, next) => {
     console.error("Global error:", err.message || err);
+
+    // set CORS headers when possible so browser can see the error
+    const originHeader = req.headers.origin ? req.headers.origin.replace(/\/$/, "") : null;
+    if (originHeader && allowedOrigins.has(originHeader)) {
+        res.setHeader('Access-Control-Allow-Origin', req.headers.origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+
     res.status(500).json({ error: "Server error" });
 });
-
 
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
