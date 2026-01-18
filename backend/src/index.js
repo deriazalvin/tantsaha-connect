@@ -248,52 +248,68 @@ app.get("/api/weather/daily/:locationId", async (req, res) => {
 // =========================
 // PHOTO DE PROFILE
 // =========================
+// GET /api/users/me
 app.get("/api/users/me", verifyJWT, async (req, res) => {
-    try {
-        const [rows] = await pool.query(
-            `SELECT u.id, u.email, u.full_name, u.phone, u.profile_photo_url,
-                r.id AS region_id, r.name AS region_name
-            FROM users u
-            LEFT JOIN regions r ON r.id = u.region_id
-            WHERE u.id = ?`,
-            [req.user.id]
-        );
+  try {
+    console.log("/api/users/me called, user:", req.user && { id: req.user.id, email: req.user.email });
+    const [rows] = await pool.query(
+      `SELECT u.id, u.email, u.full_name, u.phone, u.profile_photo_url,
+              r.id AS region_id, r.name AS region_name
+       FROM users u
+       LEFT JOIN regions r ON r.id = u.region_id
+       WHERE u.id = ?`,
+      [req.user.id]
+    );
 
-        if (!rows.length) return res.status(404).json({ error: "Utilisateur introuvable" });
-
-        const u = rows[0];
-        res.json({
-            id: u.id,
-            email: u.email,
-            full_name: u.full_name,
-            phone: u.phone,
-            profile_photo_url: u.profile_photo_url,
-            region: u.region_id ? { id: u.region_id, name: u.region_name } : null,
-        });
-    } catch (err) {
-        console.error("/users/me error:", err);
-        res.status(500).json({ error: "Server error" });
+    if (!rows.length) {
+      console.warn("/api/users/me: user not found", req.user.id);
+      return res.status(404).json({ error: "Utilisateur introuvable" });
     }
+
+    const u = rows[0];
+    res.json({
+      id: u.id,
+      email: u.email,
+      full_name: u.full_name,
+      phone: u.phone,
+      profile_photo_url: u.profile_photo_url,
+      region: u.region_id ? { id: u.region_id, name: u.region_name } : null,
+    });
+  } catch (err) {
+    console.error("/api/users/me error:", err.stack || err);
+    // During debugging you can return err.message to the client, but remove in prod
+    res.status(500).json({ error: "Server error", detail: err.message || String(err) });
+  }
 });
 
 app.post("/api/users/profile", verifyJWT, async (req, res) => {
-    console.log("POST /api/users/profile body:", req.body);
-    const { full_name, phone } = req.body;
+  console.log("POST /api/users/profile body:", req.body, "user:", req.user && req.user.id);
+  const { full_name, phone } = req.body;
 
-    try {
-        await pool.query(
-            "UPDATE users SET full_name = ?, phone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            [full_name, phone, req.user.id]
-        );
-        const [[user]] = await pool.query(
-            "SELECT id, email, full_name, phone, profile_photo_url FROM users WHERE id = ?",
-            [req.user.id]
-        );
-        res.json(user);
-    } catch (err) {
-        console.error("Update profile error:", err);
-        res.status(500).json({ error: "Update failed" });
-    }
+  try {
+    await pool.query(
+      "UPDATE users SET full_name = ?, phone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      [full_name, phone, req.user.id]
+    );
+    const [[user]] = await pool.query(
+      "SELECT id, email, full_name, phone, profile_photo_url FROM users WHERE id = ?",
+      [req.user.id]
+    );
+    res.json(user);
+  } catch (err) {
+    console.error("/api/users/profile error:", err.stack || err);
+    res.status(500).json({ error: "Update failed", detail: err.message || String(err) });
+  }
+});
+
+app.get('/debug/ping-db', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT 1 AS ok');
+    res.json({ ok: true, rows });
+  } catch (e) {
+    console.error('/debug/ping-db error:', e.stack || e);
+    res.status(500).json({ ok: false, error: e.message || String(e) });
+  }
 });
 
 // =========================
