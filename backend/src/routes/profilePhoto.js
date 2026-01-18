@@ -5,28 +5,42 @@ const verifyJWT = require("../middlewares/verifyJWT");
 const pool = require("../db");
 
 router.post(
-    "/profile/photo",
-    verifyJWT,
-    upload.single("photo"), 
-    async (req, res) => {
-        try {
-            if (!req.file) {
-                return res.status(400).json({ error: "Aucune image envoyée" });
-            }
+  "/profile/photo",
+  verifyJWT,
+  // wrap multer usage in a small handler to capture multer errors
+  (req, res, next) => {
+    upload.single("photo")(req, res, (err) => {
+      if (err) {
+        console.error("Multer error during profile photo upload:", err.stack || err);
+        return res.status(400).json({ error: err.message || "Upload error" });
+      }
+      next();
+    });
+  },
+  async (req, res) => {
+    try {
+      console.log("Profile photo upload attempt:", {
+        userId: req.user?.id,
+        file: req.file ? { filename: req.file.filename, path: req.file.path, size: req.file.size } : null,
+      });
 
-            const photoUrl = `/uploads/profile/${req.file.filename}`;
+      if (!req.file) {
+        return res.status(400).json({ error: "Aucune image envoyée" });
+      }
 
-            await pool.query(
-                "UPDATE users SET profile_photo_url = ? WHERE id = ?",
-                [photoUrl, req.user.id]
-            );
+      const photoUrl = `/uploads/profile/${req.file.filename}`;
 
-            res.json({ profile_photo_url: photoUrl });
-        } catch (err) {
-            console.error(err);
-            res.status(500).json({ error: "Erreur serveur" });
-        }
+      await pool.query(
+        "UPDATE users SET profile_photo_url = ? WHERE id = ?",
+        [photoUrl, req.user.id]
+      );
+
+      res.json({ profile_photo_url: photoUrl });
+    } catch (err) {
+      console.error("Profile photo handler error:", err.stack || err);
+      res.status(500).json({ error: "Erreur serveur" });
     }
+  }
 );
 
 module.exports = router;

@@ -124,9 +124,22 @@ export default function Weather({ onNavigate }: WeatherProps) {
   /* 🌦️ IMAGE */
   const bgImage = useMemo(() => {
     if (!current) return "";
-    return getWeatherImage(current.condition, clock);
+    try {
+      return getWeatherImage(current.condition, clock) || "";
+    } catch (e) {
+      console.warn("getWeatherImage error:", e);
+      return "";
+    }
   }, [current, clock]);
 
+  if (!bgImage) {
+    // warning utile dans la console mais pas avant définition de bgImage
+    console.warn("getWeatherImage returned empty for condition:", current?.condition);
+  }
+
+  const bgStyle = bgImage ? { backgroundImage: `url(${bgImage})` } : { backgroundColor: '#0f172a' /* fallback */ };
+
+}
   /* =====================
      HELPERS "SOURCE OF TRUTH"
   ===================== */
@@ -430,7 +443,7 @@ export default function Weather({ onNavigate }: WeatherProps) {
       <motion.div
         key={current.condition + Math.floor(clock.getHours() / 6)}
         className="absolute inset-0 bg-cover bg-center rounded-2xl"
-        style={{ backgroundImage: `url(${bgImage})` }}
+        style={bgStyle}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
