@@ -16,7 +16,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "change_me";
 // =========================
 const allowedOrigins = [
     "https://tantsaha-connect.vercel.app",
-    "https://tantsaha-connect-beta.vercel.app",
+    "https://tantsaha-connect-beta.vercel.app/",
     "http://localhost:5173", // tests locaux
 ];
 
