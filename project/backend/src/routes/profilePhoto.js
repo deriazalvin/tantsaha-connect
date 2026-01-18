@@ -4,11 +4,10 @@ const upload = require("../middlewares/upload");
 const verifyJWT = require("../middlewares/verifyJWT");
 const pool = require("../db");
 
-// POST /api/profile/photo
 router.post(
     "/profile/photo",
     verifyJWT,
-    upload.single("photo"), // juste "photo", pas de second argument
+    upload.single("photo"), 
     async (req, res) => {
         try {
             if (!req.file) {
@@ -30,4 +29,4 @@ router.post(
     }
 );
 
-module.exports = router; // important !
+module.exports = router;

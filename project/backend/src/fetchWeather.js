@@ -9,13 +9,13 @@ async function fetchWeatherForLocation({
     region,
     country
 }) {
-    console.log("➡️ fetchWeatherForLocation called", {
+    console.log(" fetchWeatherForLocation called", {
         latitude,
         longitude,
         place_name
     });
 
-    // 0️⃣ Vérifier si la localisation existe déjà
+    // Manamarina raha efa miexiter ilay toerana
     const [[existing]] = await pool.query(
         `SELECT id FROM weather_locations WHERE latitude = ? AND longitude = ?`,
         [latitude, longitude]
@@ -24,10 +24,10 @@ async function fetchWeatherForLocation({
     let locationId;
 
     if (existing) {
-        console.log("📍 Existing location found:", existing.id);
+        console.log(" Existing location found:", existing.id);
         locationId = existing.id;
 
-        // 🔄 (OPTIONNEL) Effacer l'ancien weather pour éviter doublons
+        // Manala ny données taloha mba ialana @doublons
         await pool.query(`DELETE FROM weather_hourly WHERE location_id = ?`, [locationId]);
         await pool.query(`DELETE FROM weather_daily WHERE location_id = ?`, [locationId]);
 
@@ -42,7 +42,6 @@ async function fetchWeatherForLocation({
         );
     }
 
-    // 1️⃣ Open-Meteo fetch
     const url = "https://api.open-meteo.com/v1/forecast";
     const params = {
         latitude,
@@ -54,7 +53,7 @@ async function fetchWeatherForLocation({
 
     const { data } = await axios.get(url, { params, timeout: 15000 });
 
-    // 2️⃣ Hourly
+    // Isan'ora
     for (let i = 0; i < data.hourly.time.length; i++) {
         await pool.query(
             `INSERT INTO weather_hourly
@@ -72,7 +71,7 @@ async function fetchWeatherForLocation({
         );
     }
 
-    // 3️⃣ Daily
+    // Isan'andro
     for (let i = 0; i < data.daily.time.length; i++) {
         await pool.query(
             `INSERT INTO weather_daily
@@ -89,7 +88,7 @@ async function fetchWeatherForLocation({
         );
     }
 
-    console.log("✅ Weather stored for:", locationId);
+    console.log(" Weather stored for:", locationId);
     return { ok: true, locationId };
 }
 

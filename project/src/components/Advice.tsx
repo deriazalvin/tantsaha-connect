@@ -128,17 +128,17 @@ export default function Advice({ onNavigate }: AdviceProps) {
         const cacheKey = `advice:${id}:${qs.toString()}`;
         const url = `${API_URL}/api/advice/by-weather/${id}?${qs.toString()}`;
 
-        // 1) Lire cache d'abord
+        // 1) Mamaky cash ny priorité
         const cached = await readAdviceCache(cacheKey);
         if (cached && !cancelled) {
           setMeta(cached.meta ?? null);
           setAdvices(cached.advices ?? []);
         }
 
-        // 2) Offline => stop (on garde cache)
+        // 2) Raha tsy enligne dia tazomina ny cache
         if (!navigator.onLine) return;
 
-        // 3) Online => fetch + write cache
+        // 3) Raha actif dia maka donnée sady mameno cache
         const res = await fetch(url);
         const data = (res.ok ? await res.json() : { meta: null, advices: [] }) as AdvicePayload;
 

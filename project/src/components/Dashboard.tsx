@@ -23,12 +23,12 @@ type CurrentWeather = {
   temperature: number;
   condition: string;
   icon: string | number;
-  placename: string;     // au lieu de placename
+  placename: string;     
   time: string;
 };
 
 type HourlyWeather = {
-  forecasttime: string;  // au lieu de forecast_time
+  forecasttime: string;  
   temp: number;
   wind: number;
   humidity: number;
@@ -191,14 +191,14 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       if (!cancelled) setLoading(true);
 
       try {
-        // 1) OFFLINE-FIRST: météo depuis localStorage
+        // LocalStorage toetrandro
         const wc = readWeatherCache(id);
         if (wc?.current && !cancelled) {
           setCurrent(wc.current);
           setNextHour(wc.hourly?.[0] ?? null);
         }
 
-        // 2) OFFLINE-FIRST: advice/alerts depuis IndexedDB (mêmes keys que tes pages)
+        // Indexdb : torohevitra , fampitandremana
         const adviceKey = `advice:${id}:${new URLSearchParams({ limit: "50" }).toString()}`;
         const alertsKey = `alerts:${id}:${new URLSearchParams({ limit: "3" }).toString()}`;
 
@@ -212,10 +212,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           setAlertTop(alertsCached?.alerts?.[0] ?? null);
         }
 
-        // 3) Si offline: on stop ici (on garde l’affichage cache)
+        // Tsy actif (gardena ny cache)
         if (!navigator.onLine) return;
 
-        // 4) Online: on refresh depuis API (comme avant)
+        // En ligne (maka données)
         const [curRes, hourRes, adviceRes, alertsRes] = await Promise.all([
           fetch(`${API_URL}/api/weather/current/${id}`),
           fetch(`${API_URL}/api/weather/hourly/${id}`),
@@ -237,8 +237,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       } catch (e) {
         console.error("Dashboard load error", e);
 
-        // important: ne pas vider si offline (car on a peut-être déjà affiché le cache)
-        if (!cancelled && !navigator.onLine) return;
+        
 
         if (!cancelled) {
           setCurrent(null);
@@ -268,7 +267,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-sky-50 to-amber-50">
-      {/* Header: clair + accents */}
+      {/* Header*/}
       <header className="border-b border-white/60 bg-white/70 backdrop-blur">
         <div className="max-w-6xl mx-auto px-4 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">

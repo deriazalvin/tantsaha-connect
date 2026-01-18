@@ -26,20 +26,19 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
-// CORS - DOIT ÊTRE AVANT TOUTES LES ROUTES
+// CORS
 // =========================
 app.use(cors({
     origin: function (origin, callback) {
-        if (!origin) return callback(null, true); // Postman ou backend
+        if (!origin) return callback(null, true);
         if (allowedOrigins.includes(origin)) return callback(null, true);
-        return callback(new Error("CORS not allowed"));
+        return callback(new Error("CORS non autorisé"));
     },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
 }));
 
-// OPTIONS preflight
 app.options("*", cors());
 
 // =========================
@@ -62,7 +61,7 @@ function verifyJWT(req, res, next) {
 
     try {
         req.user = jwt.verify(auth.slice(7), JWT_SECRET);
-        console.log("JWT decoded:", req.user); // <-- log utile pour debug
+        console.log("JWT decoded:", req.user);
         next();
     } catch (err) {
         console.error("JWT error:", err);
@@ -90,9 +89,9 @@ function mapWeatherCode(code) {
     return "Unknown";
 }
 
-// =========================
-// AUTH ROUTES
-// =========================
+// =======================================
+// FISORATANA ANARANA SY FAMORONANA KAONTY
+// =======================================
 app.post("/auth/signup", async (req, res) => {
     const { email, password, full_name } = req.body;
     if (!email || !password) return res.status(400).json({ error: "Missing fields" });
@@ -137,7 +136,7 @@ app.post("/auth/login", async (req, res) => {
 });
 
 // =========================
-// WEATHER ROUTES
+// TOETRANDRO
 // =========================
 app.post("/api/weather/refresh", async (req, res) => {
     const { latitude, longitude, place_name, placename, region, country } = req.body || {};
@@ -233,7 +232,7 @@ app.get("/api/weather/daily/:locationId", async (req, res) => {
 
 
 // =========================
-// USER PROFILE
+// PHOTO DE PROFILE
 // =========================
 app.get("/api/users/me", verifyJWT, async (req, res) => {
     const [rows] = await pool.query(
@@ -280,7 +279,7 @@ app.post("/api/users/profile", verifyJWT, async (req, res) => {
 
 
 // =========================
-// JOURNAL
+// NAOTY
 // =========================
 app.get("/api/journal", verifyJWT, async (req, res) => {
     const [rows] = await pool.query("SELECT * FROM crop_journal WHERE user_id = ? ORDER BY observation_date DESC", [
@@ -333,9 +332,9 @@ app.delete("/api/journal/:id", verifyJWT, async (req, res) => {
     }
 });
 
-// =========================
-// ADVICE & ALERTS
-// =========================
+// ==============================
+// TOROHEVITRA SY FAMPITANDREMANA
+// ==============================
 app.get("/api/advice/by-weather/:locationId", async (req, res) => {
     const { locationId } = req.params;
     const limit = Math.min(parseInt(req.query.limit || "20", 10) || 20, 50);
@@ -466,12 +465,5 @@ app.get("/api/alerts/by-weather/:locationId", async (req, res) => {
     }
 });
 
-// =========================
-// PING
-// =========================
-app.get("/api/ping", (req, res) => res.json({ ok: true, time: Date.now() }));
 
-// =========================
-// START SERVER
-// =========================
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));

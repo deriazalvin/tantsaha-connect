@@ -1,7 +1,6 @@
-// backend/src/generateAudioAlerts.js
 import fs from 'fs';
 import path from 'path';
-import gTTS from 'gtts'; // npm i gtts
+import gTTS from 'gtts';
 
 export function generateAudioAlert(forecast, regionName) {
   const dateStr = new Date(forecast.forecast_date).toLocaleDateString('mg-MG', {
@@ -28,10 +27,9 @@ export function generateAudioAlert(forecast, regionName) {
 
   const filename = path.join(process.cwd(), 'public', 'audio', 'alerts', `alert-${forecast.id}.mp3`);
 
-  // créer dossier si non existant
   fs.mkdirSync(path.dirname(filename), { recursive: true });
 
-  const gtts = new gTTS(text, 'mg'); // 'mg' = Malagasy
+  const gtts = new gTTS(text, 'mg');
   gtts.save(filename, function(err) {
     if (err) throw err;
     console.log('Audio alert saved:', filename);

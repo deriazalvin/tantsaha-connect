@@ -5,7 +5,6 @@ const { v4: uuidv4 } = require("uuid");
 
 const uploadDir = "uploads/profile";
 
-// créer le dossier s’il n’existe pas
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
