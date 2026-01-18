@@ -5,6 +5,7 @@ const path = require("path");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const pool = require("./db");
+const { fetchWeatherForLocation } = require("./fetchWeather");
 
 dotenv.config();
 const app = express();
@@ -495,6 +496,19 @@ app.use((err, req, res, next) => {
     }
 
     res.status(500).json({ error: "Server error" });
+});
+app.use((err, req, res, next) => {
+  // affiche la stack complète pour faciliter le debug
+  console.error("Global error:", err.stack || err);
+
+  // set CORS headers when possible so browser can see the error
+  const originHeader = req.headers.origin ? req.headers.origin.replace(/\/$/, "") : null;
+  if (originHeader && allowedOrigins.has(originHeader)) {
+    res.setHeader("Access-Control-Allow-Origin", req.headers.origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
+
+  res.status(500).json({ error: "Server error" });
 });
 
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
