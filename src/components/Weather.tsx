@@ -354,6 +354,54 @@ export default function Weather({ onNavigate }: WeatherProps) {
   }, [locationId]);
 
   /* =====================
+     New: explicit refresh for the currently selected location
+  ===================== */
+  async function refreshCurrent() {
+    // If there's no locationId, fall back to the earlier flow (geolocation / search)
+    if (!locationId) {
+      return refreshWeather();
+    }
+
+    if (!isOnline()) {
+      // try cache if offline
+      hydrateFromCache(locationId);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const [curRes, hourRes, dayRes] = await Promise.all([
+        fetch(`${API_URL}/api/weather/current/${locationId}`),
+        fetch(`${API_URL}/api/weather/hourly/${locationId}`),
+        fetch(`${API_URL}/api/weather/daily/${locationId}`),
+      ]);
+
+      const cur = curRes.ok ? await curRes.json() : null;
+      const hour = hourRes.ok ? await hourRes.json() : [];
+      const day = dayRes.ok ? await dayRes.json() : [];
+
+      setCurrent(cur);
+      setHourly(hour || []);
+      setDaily(day || []);
+
+      writeCache({
+        savedAt: Date.now(),
+        locationId,
+        coords,
+        current: cur,
+        hourly: hour || [],
+        daily: day || [],
+      });
+    } catch (e) {
+      console.error("refreshCurrent error:", e);
+      // if error, try hydrate from cache
+      hydrateFromCache(locationId);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /* =====================
      UI
   ===================== */
   if (loading)
@@ -402,12 +450,11 @@ export default function Weather({ onNavigate }: WeatherProps) {
           <div className="flex items-center gap-3">
             <button
               title="Actualiser"
-              onClick={() => {
-                if (locationId) refreshWeather();
-              }}
-              className="flex items-center gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-xl"
+              onClick={() => refreshCurrent()}
+              disabled={loading}
+              className="flex items-center gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-xl disabled:opacity-60"
             >
-              <RefreshCw className="w-4 h-4" /> Actualiser
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Actualiser
             </button>
 
             <button
