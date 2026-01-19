@@ -82,7 +82,6 @@ function safeParseJSON<T>(raw: string | null): T | null {
   }
 }
 
-
 function readCache(locationId: string): WeatherCache | null {
   return safeParseJSON<WeatherCache>(localStorage.getItem(CACHE_PREFIX + locationId));
 }
@@ -93,6 +92,18 @@ function writeCache(payload: WeatherCache) {
 
 function isOnline() {
   return navigator.onLine;
+}
+
+/* =====================
+   UTIL
+===================== */
+function formatHour(iso: string) {
+  try {
+    const d = new Date(iso);
+    return d.getHours().toString().padStart(2, "0") + ":00";
+  } catch {
+    return "";
+  }
 }
 
 /* =====================
@@ -115,13 +126,13 @@ export default function Weather({ onNavigate }: WeatherProps) {
     return saved ? safeParseJSON<Favorite[]>(saved) ?? [] : [];
   });
 
-  /* ⏰ HORLOGE */
+  /* ⏰ CLOCK */
   useEffect(() => {
     const t = setInterval(() => setClock(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
 
-  /* 🌦️ IMAGE */
+  /* 🌦️ BACKGROUND IMAGE */
   const bgImage = useMemo(() => {
     if (!current) return "";
     try {
@@ -132,13 +143,14 @@ export default function Weather({ onNavigate }: WeatherProps) {
     }
   }, [current, clock]);
 
-  if (!bgImage) {
-    console.warn("getWeatherImage returned empty for condition:", current?.condition);
-  }
+  const bgStyle = bgImage
+    ? {
+        backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.25), rgba(0,0,0,0.55)), url(${bgImage})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }
+    : { background: "linear-gradient(180deg,#021024,#04203a)" };
 
-  const bgStyle = bgImage ? { backgroundImage: `url(${bgImage})` } : { backgroundColor: '#0f172a' /* fallback */ };
-
-}
   /* =====================
      HELPERS "SOURCE OF TRUTH"
   ===================== */
@@ -198,8 +210,6 @@ export default function Weather({ onNavigate }: WeatherProps) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ latitude: lat, longitude: lon, place_name: placeName }),
-
-
     });
 
     if (!res.ok) throw new Error("Server error: " + res.status);
@@ -209,6 +219,7 @@ export default function Weather({ onNavigate }: WeatherProps) {
 
     setActiveLocation(data.locationId, { lat, lon });
   }
+
   type GeoResult = {
     id: number;
     name: string;
@@ -282,18 +293,15 @@ export default function Weather({ onNavigate }: WeatherProps) {
       return;
     }
 
-    //  lat/lon déjà fournis
+    // lat/lon déjà fournis
     await fetchWeatherRefresh(lat, lon, cityName || "Ville recherchée");
   }
-
-
 
   /* =====================
      MAIN LOAD (depends on locationId)
   ===================== */
   useEffect(() => {
     if (!locationId) {
-      // 1er démarrage sans id: si online on déclenche un refresh pour créer locationId
       if (isOnline()) refreshWeather();
       else setLoading(false);
       return;
@@ -304,14 +312,12 @@ export default function Weather({ onNavigate }: WeatherProps) {
     const load = async () => {
       setLoading(true);
 
-      // Offline => cache
       if (!isOnline()) {
         hydrateFromCache(locationId);
         if (!cancelled) setLoading(false);
         return;
       }
 
-      // Online => API then cache
       try {
         const [cur, hour, day] = await Promise.all([
           fetch(`${API_URL}/api/weather/current/${locationId}`).then((r) => r.json()),
@@ -350,190 +356,193 @@ export default function Weather({ onNavigate }: WeatherProps) {
   /* =====================
      UI
   ===================== */
-  if (loading) return <div className="min-h-screen flex items-center justify-center">⏳ Mahandrasa...</div>;
+  if (loading)
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-black via-gray-900 to-gray-800 text-white">
+        <div className="animate-pulse space-y-3">
+          <div className="h-8 w-64 bg-gray-700 rounded" />
+          <div className="h-48 w-[90vw] max-w-4xl bg-gray-800 rounded-lg mt-6" />
+          <div className="flex gap-3 mt-4">
+            <div className="h-24 w-24 bg-gray-800 rounded-lg" />
+            <div className="h-24 w-24 bg-gray-800 rounded-lg" />
+            <div className="h-24 w-24 bg-gray-800 rounded-lg" />
+          </div>
+        </div>
+      </div>
+    );
+
   if (!current)
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-black via-gray-900 to-gray-800 text-white">
         Tsy misy angon-drakitra momba ny toetr’andro
       </div>
     );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-gray-800 text-white">
-  {/* Header */}
-  <header className="p-4 flex flex-col gap-4">
-    <div className="flex justify-between items-center">
-      {/* Left: back button + location */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => onNavigate("dashboard")}
-          className="p-2 bg-gray-700/60 hover:bg-green-600 rounded-full transition-colors"
-        >
-          <ArrowLeft className="w-6 h-6" />
-        </button>
+    <div className="min-h-screen text-white" style={bgStyle}>
+      <div className="backdrop-blur-sm bg-black/25 min-h-screen">
+        {/* Header */}
+        <header className="max-w-6xl mx-auto px-4 py-6 flex items-start justify-between gap-6">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => onNavigate("dashboard")}
+              className="p-3 bg-white/10 hover:bg-white/20 rounded-xl transition"
+              title="Retour"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
 
-        <MapPin className="w-5 h-5 text-green-400" />
-
-        <div className="flex flex-col">
-          <div className="font-bold text-lg">{current.place_name}</div>
-          <div className="text-sm opacity-70">
-            {clock.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+            <div>
+              <div className="text-sm text-white/90">Toe-javatra anio</div>
+              <div className="text-2xl font-extrabold tracking-tight">{current.place_name}</div>
+              <div className="text-sm text-white/80">{clock.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Right: refresh + favorite */}
-      <div className="flex gap-2">
-        <button className="p-2 bg-gray-700/50 hover:bg-gray-600 rounded-lg transition">
-          <RefreshCw />
-        </button>
-        <button className="p-2 bg-gray-700/50 hover:bg-yellow-500 rounded-lg transition">
-          <Star />
-        </button>
-      </div>
-    </div>
+          <div className="flex items-center gap-3">
+            <button
+              title="Actualiser"
+              onClick={() => {
+                if (locationId) refreshWeather();
+              }}
+              className="flex items-center gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-xl"
+            >
+              <RefreshCw className="w-4 h-4" /> Actualiser
+            </button>
 
-    {/* Favorites */}
-    <div className="flex gap-2 overflow-x-auto mt-2">
-      {favorites.map((f) => (
-        <div
-          key={f.locationId}
-          className="bg-white/10 hover:bg-white/20 transition-colors rounded-xl p-2 flex items-center gap-2 cursor-pointer"
-          onClick={() => setActiveLocation(f.locationId, { lat: f.lat, lon: f.lon })}
-        >
-          <span className="whitespace-nowrap">{f.place_name}</span>
-          <X
-            className="w-4 h-4 hover:text-red-500"
-            onClick={(e) => {
-              e.stopPropagation();
-              removeFavorite(f.locationId);
-            }}
-          />
-        </div>
-      ))}
-    </div>
+            <button
+              title="Ajouter aux favoris"
+              onClick={addFavorite}
+              className="flex items-center gap-2 px-3 py-2 bg-yellow-600 text-black font-semibold rounded-xl"
+            >
+              <Star className="w-4 h-4" /> Favoris
+            </button>
+          </div>
+        </header>
 
-    {/* Search bar */}
-    <div className="mt-2 flex gap-2">
-      <input
-        type="text"
-        placeholder="Rechercher une ville..."
-        value={searchCity}
-        onChange={(e) => setSearchCity(e.target.value)}
-        className="flex-1 p-3 rounded-xl bg-white/10 placeholder-white text-white focus:outline-none focus:ring-2 focus:ring-green-500 transition"
-      />
-      <button
-        className="p-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-semibold transition"
-        onClick={() => {
-          if (!searchCity.trim()) return;
-          refreshWeather(undefined, undefined, searchCity).catch(console.error);
-        }}
-      >
-        Rechercher
-      </button>
-    </div>
-  </header>
+        {/* Hero */}
+        <main className="max-w-6xl mx-auto px-4 pb-8">
+          <section className="rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-b from-white/6 to-white/3 border border-white/10">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
+              {/* Left: big info */}
+              <div className="col-span-2 flex flex-col justify-between gap-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-white/10 rounded-2xl p-4">
+                      <div className="text-6xl font-extrabold leading-none">{current.temperature}°</div>
+                      <div className="text-sm text-white/80 mt-1">{conditionMG[current.condition] || current.condition}</div>
+                    </div>
 
-  {/* Current weather */}
-  <section className="h-[70vh] flex flex-col justify-end px-6 pb-10 relative">
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={current.condition + Math.floor(clock.getHours() / 6)}
-        className="absolute inset-0 bg-cover bg-center rounded-2xl"
-        style={bgStyle}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 1.2 }}
-      />
-    </AnimatePresence>
+                    <div className="hidden md:block">
+                      <div className="text-xs text-white/80">Toetrandro ankehitriny</div>
+                      <div className="text-lg text-white/90 font-medium mt-2">{current.place_name}</div>
+                      <div className="text-sm text-white/70 mt-1">{current.time}</div>
+                    </div>
+                  </div>
 
-    <div className="absolute inset-0 bg-black/40 rounded-2xl" />
-    <div className="relative z-10 text-center">
-      <motion.div
-        key={current.temperature}
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.8 }}
-        className="text-6xl sm:text-7xl font-bold drop-shadow-lg"
-      >
-        {current.temperature}°
-      </motion.div>
+                  <div className="flex gap-3">
+                    <div className="p-3 bg-white/5 rounded-lg flex flex-col items-center">
+                      <Wind className="w-5 h-5 text-white/90" />
+                      <div className="mt-1 text-sm">{hourly?.[0]?.wind ?? "—"} km/h</div>
+                    </div>
+                    <div className="p-3 bg-white/5 rounded-lg flex flex-col items-center">
+                      <Droplet className="w-5 h-5 text-white/90" />
+                      <div className="mt-1 text-sm">{hourly?.[0]?.humidity ?? "—"}%</div>
+                    </div>
+                  </div>
+                </div>
 
-      <motion.div
-        key={current.condition}
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.8, delay: 0.2 }}
-        className="text-lg sm:text-xl opacity-80"
-      >
-        {conditionMG[current.condition] || current.condition}
-      </motion.div>
-    </div>
-  </section>
+                {/* Hourly strip */}
+                <div className="mt-4">
+                  <div className="text-sm text-white/80 mb-3">Isan'ora (24h)</div>
+                  <div className="flex gap-3 overflow-x-auto pb-2">
+                    {hourly.map((h, i) => (
+                      <div
+                        key={i}
+                        className="min-w-[110px] bg-white/6 rounded-2xl p-3 flex flex-col items-center text-center"
+                      >
+                        <div className="text-xs text-white/70">{formatHour(h.forecast_time)}</div>
+                        <div className="text-lg font-bold my-1">{h.temp}°</div>
+                        <div className="text-xs text-white/70 flex items-center gap-1">
+                          <Wind className="w-3 h-3" /> {h.wind}
+                        </div>
+                        <div className="text-xs text-white/70 mt-1">{h.humidity}%</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
 
-  {/* Map */}
-  {coords && (
-    <section className="px-6 py-6">
-      <h2 className="font-bold text-lg mb-3">Carte météo</h2>
-      <WeatherMap
-        coords={coords}
-        favorites={favorites.map((fav) => ({
-          lat: fav.lat,
-          lon: fav.lon,
-          name: fav.place_name,
-        }))}
-      />
-    </section>
-  )}
+              {/* Right: daily & map */}
+              <aside className="flex flex-col gap-4">
+                <div className="bg-white/5 rounded-2xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs text-white/80">Andro manaraka</div>
+                      <div className="text-sm text-white/90 font-semibold">{daily?.length ?? 0} andro</div>
+                    </div>
+                    <button
+                      onClick={() => onNavigate("weather")}
+                      className="text-sm text-white/70 underline"
+                    >
+                      Hijery daholo
+                    </button>
+                  </div>
 
-  {/* Hourly forecast */}
-  <section className="px-6 py-4 overflow-x-auto">
-    <h2 className="font-bold text-lg mb-3">Isan’ora</h2>
-    <div className="flex gap-4 min-w-max">
-      {hourly.map((h, i) => {
-        const date = new Date(h.forecast_time);
-        return (
-          <motion.div
-            key={i}
-            className="bg-white/10 hover:bg-white/20 transition-colors rounded-2xl p-4 min-w-[120px] flex flex-col items-center"
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.6, delay: i * 0.05 }}
-          >
-            <div className="text-sm opacity-70">{date.getHours()}:00</div>
-            <div className="text-xl font-bold">{h.temp}°</div>
-            <div className="mt-2 text-xs flex items-center gap-1">
-              <Wind className="w-3 h-3" /> {h.wind} km/h
+                  <div className="mt-3 space-y-2">
+                    {daily.map((d, idx) => (
+                      <div key={idx} className="flex items-center justify-between">
+                        <div className="text-sm text-white/80">
+                          {new Date(d.forecast_date).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" })}
+                        </div>
+                        <div className="text-sm text-white/90 font-semibold">{d.temp_min}° / {d.temp_max}°</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {coords && (
+                  <div className="bg-white/5 rounded-2xl p-3 h-40">
+                    <WeatherMap
+                      coords={coords}
+                      favorites={favorites.map((fav) => ({ lat: fav.lat, lon: fav.lon, name: fav.place_name }))}
+                    />
+                  </div>
+                )}
+              </aside>
             </div>
-            <div className="text-xs flex items-center gap-1">
-              <Droplet className="w-3 h-3" /> {h.humidity}%
+          </section>
+
+          {/* Favorites / actions */}
+          <section className="mt-6 max-w-6xl">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold">Favorites</h3>
+              <div className="text-sm text-white/70">{favorites.length} sauvegardé(s)</div>
             </div>
-          </motion.div>
-        );
-      })}
-    </div>
-  </section>
 
-  {/* Daily forecast */}
-  <section className="bg-white text-gray-900 rounded-t-3xl px-6 pt-6 mt-8">
-    <h2 className="font-bold text-lg mb-4">Andro manaraka</h2>
-    {daily.map((d, i) => (
-      <div key={i} className="flex justify-between py-4 border-b last:border-b-0">
-        <div className="text-sm sm:text-base">
-          {new Date(d.forecast_date).toLocaleDateString("mg-MG", {
-            weekday: "short",
-            day: "numeric",
-            month: "short",
-          })}
-        </div>
-        <div className="font-semibold text-sm sm:text-base">
-          {d.temp_min}° / {d.temp_max}°
-        </div>
+            <div className="flex gap-3 flex-wrap">
+              {favorites.length === 0 && <div className="text-white/70">Aucun favoris</div>}
+              {favorites.map((f) => (
+                <button
+                  key={f.locationId}
+                  onClick={() => setActiveLocation(f.locationId, { lat: f.lat, lon: f.lon })}
+                  className="px-4 py-2 bg-white/6 rounded-full flex items-center gap-3 hover:bg-white/10"
+                >
+                  <MapPin className="w-4 h-4" />
+                  <span>{f.place_name}</span>
+                  <X
+                    className="w-3 h-3 ml-2 text-white/60"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFavorite(f.locationId);
+                    }}
+                  />
+                </button>
+              ))}
+            </div>
+          </section>
+        </main>
       </div>
-    ))}
-  </section>
-</div>
-
+    </div>
   );
 }
