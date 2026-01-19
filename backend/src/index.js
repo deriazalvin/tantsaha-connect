@@ -253,10 +253,9 @@ app.get("/api/users/me", verifyJWT, async (req, res) => {
   try {
     console.log("/api/users/me called, user:", req.user && { id: req.user.id, email: req.user.email });
 
-    // Requête simple sans JOIN problématique
     const [rows] = await pool.query(
-      "SELECT id, email, full_name, phone, profile_photo_url, region_id, region FROM users WHERE id = ?",
-      [req.user.id]
+    "SELECT id, email, full_name, phone, profile_photo_url FROM users WHERE id = ?",
+    [req.user.id]
     );
 
     if (!rows.length) {

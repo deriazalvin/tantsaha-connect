@@ -148,9 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setRegion(null);
   };
 
-  // Remplace la fonction updateProfile actuelle par celle-ci
 const updateProfile = async (updates: Partial<UserProfile>, persistServer = true) => {
-  // Mise à jour locale immédiate (optimistic)
   setProfile((prev) => {
     const next = { ...(prev || {}), ...updates };
     return next;
@@ -168,7 +166,6 @@ const updateProfile = async (updates: Partial<UserProfile>, persistServer = true
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      // recharger le profile depuis le serveur pour rester cohérent
       await (async () => {
         try {
           const p = await fetch(`${API_BASE}/api/users/me`, { headers: { Authorization: `Bearer ${token}` } });
@@ -187,7 +184,6 @@ const updateProfile = async (updates: Partial<UserProfile>, persistServer = true
     return { error: null };
   } catch (err) {
     console.error(err);
-    // tenter rafraîchir
     try {
       const token2 = localStorage.getItem(TOKEN_KEY);
       if (token2) {
