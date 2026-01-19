@@ -253,19 +253,18 @@ app.get("/api/users/me", verifyJWT, async (req, res) => {
   try {
     console.log("/api/users/me called, user:", req.user && { id: req.user.id, email: req.user.email });
 
-    // Requête simple sans JOIN (évite l'erreur si region_id n'existe pas)
+    // Requête simple sans JOIN problématique
     const [rows] = await pool.query(
       "SELECT id, email, full_name, phone, profile_photo_url, region_id, region FROM users WHERE id = ?",
       [req.user.id]
     );
 
     if (!rows.length) {
-      console.warn("/api/users/me: user not found", req.user.id);
       return res.status(404).json({ error: "Utilisateur introuvable" });
     }
 
     const u = rows[0];
-    const region = u.region_id || u.region ? { id: u.region_id || null, name: u.region || null } : null;
+    const region = (u.region_id || u.region) ? { id: u.region_id || null, name: u.region || null } : null;
 
     res.json({
       id: u.id,
@@ -528,10 +527,8 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: "Server error" });
 });
 app.use((err, req, res, next) => {
-  // affiche la stack complète pour faciliter le debug
   console.error("Global error:", err.stack || err);
 
-  // set CORS headers when possible so browser can see the error
   const originHeader = req.headers.origin ? req.headers.origin.replace(/\/$/, "") : null;
   if (originHeader && allowedOrigins.has(originHeader)) {
     res.setHeader("Access-Control-Allow-Origin", req.headers.origin);
