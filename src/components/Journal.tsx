@@ -59,7 +59,6 @@ export default function Journal({ onNavigate }: JournalProps) {
 
   useEffect(() => {
     if (user) loadEntries();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   async function loadEntries() {
@@ -257,7 +256,7 @@ export default function Journal({ onNavigate }: JournalProps) {
           </button>
         </div>
 
-        {/* Grid layout: Calendar + Day entries */}
+        {/* Calendrier */}
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Calendar card */}
           <div className="bg-white/85 rounded-3xl border border-white/70 shadow-sm p-5">

@@ -261,17 +261,13 @@ const [imageBroken, setImageBroken] = useState(false);
 const avatarSrc = useMemo(() => {
   const src = profile?.profile_photo_url;
   if (!src) return null;
-  // si c'est déjà une URL complète
   if (/^https?:\/\//i.test(src)) {
     return src;
   }
-  // sinon prefixe correctement API_URL sans double slash
   return `${API_URL.replace(/\/$/, "")}${src.startsWith("/") ? "" : "/"}${src}`;
 }, [profile?.profile_photo_url]);
 
-// après la déclaration de avatarSrc
 useEffect(() => {
-  // Une nouvelle URL => tenter de recharger l'image
   setImageBroken(false);
 }, [avatarSrc]);
 

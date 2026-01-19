@@ -156,8 +156,6 @@ const updateProfile = async (updates: Partial<UserProfile>, persistServer = true
     return next;
   });
 
-  // Si on ne veut pas persister côté serveur (ex: après upload qui a déjà mis à jour la DB),
-  // on s'arrête ici.
   if (!persistServer) return { error: null };
 
   const token = localStorage.getItem(TOKEN_KEY);
