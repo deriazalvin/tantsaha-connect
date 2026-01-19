@@ -252,12 +252,10 @@ app.get("/api/weather/daily/:locationId", async (req, res) => {
 app.get("/api/users/me", verifyJWT, async (req, res) => {
   try {
     console.log("/api/users/me called, user:", req.user && { id: req.user.id, email: req.user.email });
+
+    // Requête simple sans JOIN (évite l'erreur si region_id n'existe pas)
     const [rows] = await pool.query(
-      `SELECT u.id, u.email, u.full_name, u.phone, u.profile_photo_url,
-              r.id AS region_id, r.name AS region_name
-       FROM users u
-       LEFT JOIN regions r ON r.id = u.region_id
-       WHERE u.id = ?`,
+      "SELECT id, email, full_name, phone, profile_photo_url, region_id, region FROM users WHERE id = ?",
       [req.user.id]
     );
 
@@ -267,17 +265,18 @@ app.get("/api/users/me", verifyJWT, async (req, res) => {
     }
 
     const u = rows[0];
+    const region = u.region_id || u.region ? { id: u.region_id || null, name: u.region || null } : null;
+
     res.json({
       id: u.id,
       email: u.email,
       full_name: u.full_name,
       phone: u.phone,
       profile_photo_url: u.profile_photo_url,
-      region: u.region_id ? { id: u.region_id, name: u.region_name } : null,
+      region,
     });
   } catch (err) {
     console.error("/api/users/me error:", err.stack || err);
-    // During debugging you can return err.message to the client, but remove in prod
     res.status(500).json({ error: "Server error", detail: err.message || String(err) });
   }
 });
