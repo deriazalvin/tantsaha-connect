@@ -133,7 +133,6 @@ export default function Weather({ onNavigate }: WeatherProps) {
   }, [current, clock]);
 
   if (!bgImage) {
-    // warning utile dans la console mais pas avant définition de bgImage
     console.warn("getWeatherImage returned empty for condition:", current?.condition);
   }
 
@@ -249,7 +248,7 @@ export default function Weather({ onNavigate }: WeatherProps) {
       return;
     }
 
-    // ✅ Recherche ville (prioritaire)
+    // Recherche ville (prioritaire)
     if ((!lat || !lon) && cityName && cityName.trim().length >= 2) {
       const geo = await geocodeCity(cityName);
       if (!geo) throw new Error("Ville introuvable");
@@ -259,7 +258,7 @@ export default function Weather({ onNavigate }: WeatherProps) {
       return;
     }
 
-    // ✅ GPS (si pas de ville)
+    // GPS (si pas de ville)
     if (!lat || !lon) {
       const geoOptions: PositionOptions = {
         enableHighAccuracy: true,
@@ -283,7 +282,7 @@ export default function Weather({ onNavigate }: WeatherProps) {
       return;
     }
 
-    // ✅ lat/lon déjà fournis
+    //  lat/lon déjà fournis
     await fetchWeatherRefresh(lat, lon, cityName || "Ville recherchée");
   }
 
@@ -335,7 +334,6 @@ export default function Weather({ onNavigate }: WeatherProps) {
           daily: day || [],
         });
       } catch (e) {
-        // fallback cache if API fails
         if (!cancelled) hydrateFromCache(locationId);
       } finally {
         if (!cancelled) setLoading(false);
@@ -347,7 +345,6 @@ export default function Weather({ onNavigate }: WeatherProps) {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationId]);
 
   /* =====================
