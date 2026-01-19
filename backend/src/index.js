@@ -284,13 +284,28 @@ app.get("/api/users/me", verifyJWT, async (req, res) => {
 
 app.post("/api/users/profile", verifyJWT, async (req, res) => {
   console.log("POST /api/users/profile body:", req.body, "user:", req.user && req.user.id);
-  const { full_name, phone } = req.body;
+
+  const allowedFields = ["full_name", "phone", "profile_photo_url"];
+  const updates = [];
+  const params = [];
+
+  for (const key of allowedFields) {
+    if (Object.prototype.hasOwnProperty.call(req.body, key)) {
+      updates.push(`${key} = ?`);
+      params.push(req.body[key]);
+    }
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: "No fields to update" });
+  }
+  
+  const sql = `UPDATE users SET ${updates.join(", ")} WHERE id = ?`;
+  params.push(req.user.id);
 
   try {
-    await pool.query(
-      "UPDATE users SET full_name = ?, phone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-      [full_name, phone, req.user.id]
-    );
+    await pool.query(sql, params);
+
     const [[user]] = await pool.query(
       "SELECT id, email, full_name, phone, profile_photo_url FROM users WHERE id = ?",
       [req.user.id]

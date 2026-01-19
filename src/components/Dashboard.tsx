@@ -12,7 +12,7 @@ import {
   Bell,
   Lightbulb,
 } from "lucide-react";
-
+import clsx from "clsx";
 import { useAuth } from "../contexts/AuthContext";
 import { API_URL } from "../config";
 import { readAdviceCache, readAlertsCache } from "../offline/cache";
@@ -256,6 +256,24 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     };
   }, [locationId]);
 
+const [imageBroken, setImageBroken] = useState(false);
+
+const avatarSrc = useMemo(() => {
+  const src = profile?.profile_photo_url;
+  if (!src) return null;
+  // si c'est déjà une URL complète
+  if (/^https?:\/\//i.test(src)) {
+    return src;
+  }
+  // sinon prefixe correctement API_URL sans double slash
+  return `${API_URL.replace(/\/$/, "")}${src.startsWith("/") ? "" : "/"}${src}`;
+}, [profile?.profile_photo_url]);
+
+// après la déclaration de avatarSrc
+useEffect(() => {
+  // Une nouvelle URL => tenter de recharger l'image
+  setImageBroken(false);
+}, [avatarSrc]);
 
   if (loading) {
     return (
@@ -265,23 +283,70 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     );
   }
 
+  function getInitials(name?: string | null) {
+    if (!name) return "";
+    return name
+      .split(" ")
+      .map((p) => p[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-sky-50 to-amber-50">
       {/* Header*/}
       <header className="border-b border-white/60 bg-white/70 backdrop-blur">
         <div className="max-w-6xl mx-auto px-4 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={() => setShowUpload(true)}>
-              <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center overflow-hidden shadow-sm">
-                {profile?.profile_photo_url ? (
+            <button
+              onClick={() => setShowUpload(true)}
+              aria-label="Changer la photo de profil"
+              className="relative"
+            >
+              <div
+                className={clsx(
+                  "rounded-2xl bg-slate-900 text-white flex items-center justify-center overflow-hidden shadow-sm",
+                  // responsive sizes : small on mobile, larger on md+
+                  "w-12 h-12 md:w-16 md:h-16 lg:w-20 lg:h-20"
+                )}
+              >
+                {avatarSrc && !imageBroken ? (
                   <img
-                    src={`${API_URL}${profile.profile_photo_url}`}
-                    className="w-12 h-12 object-cover"
+                    src={avatarSrc}
+                    alt={profile?.full_name ? `${profile.full_name} avatar` : "Avatar"}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // on image error, cache the fact to avoid re-attempt
+                      setImageBroken(true);
+                      // optionally remove src to stop browser from retrying
+                      // @ts-ignore
+                      e.currentTarget.onerror = null;
+                      // @ts-ignore
+                      e.currentTarget.src = "";
+                    }}
                   />
+                ) : profile?.full_name ? (
+                  // initials fallback
+                  <div className="w-full h-full flex items-center justify-center bg-slate-700 text-white font-semibold">
+                    {getInitials(profile.full_name)}
+                  </div>
                 ) : (
-                  <User className="w-6 h-6" />
+                  // icon fallback
+                  <User className="w-6 h-6 md:w-8 md:h-8 text-white" />
                 )}
               </div>
+
+              {/* Edit badge */}
+              <span
+                className="absolute -right-1 -bottom-1 bg-white rounded-full p-1 border border-slate-200 shadow-sm"
+                title="Changer la photo"
+                aria-hidden
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-slate-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536M9 11l6 6L21 11l-6-6-6 6z" />
+                </svg>
+              </span>
             </button>
 
 

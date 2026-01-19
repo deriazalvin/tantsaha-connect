@@ -122,7 +122,7 @@ export default function Register({ onShowLogin }: RegisterProps) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Finday (tsy tsy maintsy)
+                Finday (tsy voatery)
               </label>
               <input
                 type="tel"

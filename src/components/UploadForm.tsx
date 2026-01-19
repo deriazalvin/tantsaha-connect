@@ -54,10 +54,14 @@ export default function UploadForm({ onClose }: Props) {
                 throw new Error(data.error || "Erreur upload");
             }
 
-            // 🔥 Mise à jour du profil global
-            await updateProfile({
-                profile_photo_url: data.profile_photo_url,
-            });
+            let photoUrl = data.profile_photo_url || null;
+            if (photoUrl) {
+            // ajouter un cache-bust pour éviter que le navigateur serve une ancienne image mise en cache
+            photoUrl = photoUrl.includes('?') ? `${photoUrl}&t=${Date.now()}` : `${photoUrl}?t=${Date.now()}`;
+            }
+
+            // mettre à jour le profile localement (pas besoin de re-appeler backend ici - upload a déjà persisté)
+            await updateProfile({ profile_photo_url: photoUrl }, false);
 
             onClose();
         } catch (err: any) {

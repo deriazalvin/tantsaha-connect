@@ -8,12 +8,15 @@
     },
     "dependencies": {
         "bcryptjs": "^2.4.3",
+        "cloudinary": "^2.9.0",
+        "clsx": "^2.1.1",
         "cors": "^2.8.5",
         "dotenv": "^16.0.0",
         "express": "^4.22.1",
         "jsonwebtoken": "^9.0.0",
         "multer": "^2.0.2",
-        "mysql2": "^3.6.0"
+        "mysql2": "^3.6.0",
+        "streamifier": "^0.1.1"
     },
     "optionalDependencies": {
         "axios": "^1.4.0",

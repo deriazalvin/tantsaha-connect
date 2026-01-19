@@ -30,7 +30,8 @@ interface AuthContextType {
   ) => Promise<{ error: string | null }>;
   signOut: () => void;
 
-  updateProfile: (updates: Partial<UserProfile>) => Promise<{ error: string | null }>;
+  // updateProfile now accepts optional persistServer boolean (default true)
+  updateProfile: (updates: Partial<UserProfile>, persistServer?: boolean) => Promise<{ error: string | null }>;
 }
 
 
@@ -147,27 +148,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setRegion(null);
   };
 
-  const updateProfile = async (updates: Partial<UserProfile>) => {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) return { error: 'Not authenticated' };
-    try {
-      const res = await fetch(`${API_BASE}/api/users/profile`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(updates),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        return { error: body.error || 'Update failed' };
-      }
-      const updated = await res.json();
-      setProfile(updated);
-      return { error: null };
-    } catch (err) {
-      console.error(err);
-      return { error: 'Update error' };
+  // Remplace la fonction updateProfile actuelle par celle-ci
+const updateProfile = async (updates: Partial<UserProfile>, persistServer = true) => {
+  // Mise à jour locale immédiate (optimistic)
+  setProfile((prev) => {
+    const next = { ...(prev || {}), ...updates };
+    return next;
+  });
+
+  // Si on ne veut pas persister côté serveur (ex: après upload qui a déjà mis à jour la DB),
+  // on s'arrête ici.
+  if (!persistServer) return { error: null };
+
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) return { error: 'Not authenticated' };
+  try {
+    const res = await fetch(`${API_BASE}/api/users/profile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      // recharger le profile depuis le serveur pour rester cohérent
+      await (async () => {
+        try {
+          const p = await fetch(`${API_BASE}/api/users/me`, { headers: { Authorization: `Bearer ${token}` } });
+          if (p.ok) {
+            const pd = await p.json();
+            setProfile(pd);
+          }
+        } catch (e) {
+          console.error('Failed to refresh profile after update failure', e);
+        }
+      })();
+      return { error: body.error || 'Update failed' };
     }
-  };
+    const updated = await res.json();
+    setProfile(updated);
+    return { error: null };
+  } catch (err) {
+    console.error(err);
+    // tenter rafraîchir
+    try {
+      const token2 = localStorage.getItem(TOKEN_KEY);
+      if (token2) {
+        const p = await fetch(`${API_BASE}/api/users/me`, { headers: { Authorization: `Bearer ${token2}` } });
+        if (p.ok) {
+          const pd = await p.json();
+          setProfile(pd);
+        }
+      }
+    } catch (e) {
+      console.error('refresh after update failed', e);
+    }
+    return { error: 'Update error' };
+  }
+};
 
   return (
     <AuthContext.Provider
